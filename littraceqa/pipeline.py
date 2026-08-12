@@ -34,9 +34,11 @@ class PipelineConfig:
     candidate_k: int = 40
     use_dense: bool = True
     use_acronyms: bool = True
-    #: Expand the paper set along the embedding graph (plan.md §2.2). The single
-    #: biggest lever on paper F1; ~0.6 F1 on multi_paper questions.
-    use_expansion: bool = True
+    #: Expand the paper set along the embedding graph. MEASURED AND DISABLED:
+    #: seeding kNN with a gold paper recovers only 20% of its cluster siblings at
+    #: k=3 (exp/06). The clusters are defined by full-text properties, not
+    #: abstract-level similarity. See reports/retrieval_findings.md.
+    use_expansion: bool = False
     expansion_similarity: float = 0.86
     max_set_size: int = 6
     #: Fallback size when the question gives no usable count cue.

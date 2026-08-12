@@ -8,3 +8,4 @@ cache/
 embeddings/
 *.npy
 *.faiss
+preds/

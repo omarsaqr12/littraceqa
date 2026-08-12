@@ -122,9 +122,16 @@ the evidence lives in **one** paper while gold lists **four**. So gold is the
 *comparison set the question is drawn from*, and the sibling papers are graded
 even though they contain no evidence.
 
-Payoff: on a 4-paper cluster, returning only the answer-bearing paper scores
-F1 = 0.40; returning the cluster scores 1.00. **Cluster expansion is worth ~0.6 F1
-on 53% of questions.** This is entity set expansion, not retrieval — see §4.3.
+Payoff *if the cluster can be recovered*: on a 4-paper gold set, returning only
+the answer-bearing paper scores F1 = 0.40; returning the cluster scores 1.00.
+
+> **Measured, and it does not work by embedding similarity.** Seeding kNN with a
+> *gold* paper recovers only 20% of its siblings at k=3 and 70% at k=200
+> (`exp/06`). The clusters are defined by a full-text property — "mentions MCTS
+> in its method figure", "cites UniAD in its main comparison table" — and their
+> members are topically unrelated at the abstract level. Dense expansion is
+> **closed as an avenue** and disabled by default. See
+> [reports/retrieval_findings.md](reports/retrieval_findings.md) and §4.3.
 
 Gold-set sizes: 26×1, 1×3, 27×4, 1×9. `multi_paper` is almost always exactly 4.
 Test questions frequently state the size in words ("the **two** ICCV 2025 papers"
@@ -257,20 +264,49 @@ Measured so far (validation, recall of gold papers):
 Single-paper retrieval is effectively solved. **Every remaining point is in
 `multi_paper`, and §2.2 says the fix is expansion, not better search.**
 
-### 4.3 Stage C — ranking + cluster expansion
+### 4.3 Stage C — selection *(measured; see reports/retrieval_findings.md)*
 
-- **C1** RRF score only (baseline).
-- **C2** cross-encoder rerank of top-40 on `(question, title+abstract)`, local GPU.
-- **C3** **cluster expansion** — the high-value one. Take the top-1 reranked paper
-  as seed, pull its k nearest neighbours in embedding space, keep those that are
-  coherent with the question's scope, emit the top-n set.
-- **C4** C2 → C3 → LLM set-verification: show the LLM the candidate set and the
-  question, let it drop members that don't belong.
+| policy | paper F1 | single | multi |
+|---|---|---|---|
+| fused list, n=1 | 0.400 | 0.692 | 0.138 |
+| `predict_set_size` | 0.403 | 0.692 | 0.143 |
+| mention-anchored, cap 6 | 0.381 | 0.628 | 0.159 |
+| adaptive expansion (sim ≥ 0.86) | 0.285 | 0.471 | 0.119 |
+| **oracle: gold papers present in top-40** | **0.756** | — | — |
 
-Set size n: from the question when it governs "papers" (§2.2), else the learned
-prior (1 for single-paper, 4 for multi-paper), with the family predicted by a
-cheap classifier. **This is the biggest single lever in the whole system — tune n
-against validation `paper_f1_macro` directly, since the F1 trade-off is explicit.**
+Two things this settles:
+
+1. **Selection is the binding constraint, not set size.** Every policy sits near
+   0.40 against a 0.756 oracle — the gold papers are in the candidate list and we
+   are failing to pick them. Better ranking is worth up to ~0.35 F1; better
+   set-size prediction at most ~0.15. **Next lever: cross-encoder rerank of the
+   top-40 on `(question, title+abstract)`, local GPU, free** — the one stage-C
+   idea the measurements have not yet closed off.
+2. **Expansion is dead** (§2.2). Disabled by default.
+
+Remaining C variants worth building, in value order:
+- **C2** cross-encoder rerank of top-40 — addresses the measured bottleneck directly.
+- **C4** LLM set-verification: show the candidate set and the question, let the
+  model drop members that don't belong. Cheap (1 call/question) and targets
+  precision, which is half of F1.
+- **C5** venue-scoped full-text index — the *only* mechanism that can answer
+  content-defined set questions ("which NAACL 2025 papers mention MCTS in their
+  method figure"). "NAACL 2025" is 1,193 papers; downloading and indexing a venue
+  is a tractable overnight job on 32 cores and 253GB of disk. Expensive, and the
+  test set may need it less than validation does — see the caveat below.
+
+**Set size.** Use the explicit count when it governs a paper noun (24/71 test
+questions state one, almost always "two"); otherwise mention-anchored sizing.
+Do not chase gold set size with more regexes — it is largely a property of how
+the benchmark was annotated, not of the question (§2.2).
+
+> **Transfer caveat.** Validation `multi_paper` gold sets are 4-paper
+> annotator-built clusters; test questions read as "the **two** ICCV 2025
+> papers". If test gold is the two *named* papers, mention-anchored selection
+> transfers better than the n=1 policy that wins on validation, despite scoring
+> 0.02 lower here. 55 questions is a small sample and the splits were built
+> differently — the first test submission is also the first measurement of which
+> regime applies. Do not over-fit stage C to validation.
 
 ### 4.4 Stage D — evidence localisation
 
@@ -352,11 +388,11 @@ the abstention threshold to three decimal places on 55 examples.
 
 | day | deliverable | gate |
 |---|---|---|
-| 11 Aug | scoring reverse-engineered, retrieval measured, plan | ✅ done |
-| 12 Aug | dense + rerank + cluster expansion; PDF fetcher w/ mirrors | paper F1 ≥ 0.75 on validation |
-| 13 Aug | evidence localisation D1–D4, ablate | evidence F1 ≥ 0.45 |
+| 11–12 Aug | scoring reverse-engineered; retrieval built + measured; PDF fetcher with mirrors; pipeline, runner, ablation harness; submission shape verified against the official validator | ✅ done — paper F1 0.400, oracle 0.756 |
+| 12 Aug | **cross-encoder rerank** (the measured bottleneck) + LLM set-verification | paper F1 ≥ 0.55 |
+| 13 Aug | evidence localisation, ablate D1–D4 on validation | evidence F1 ≥ 0.45 |
 | 14 Aug | MC + table synthesis, full pipeline, **first test submission** | valid submission on the board |
-| 15–17 Aug | ablate, fix weakest evidence type, self-consistency, expansion tuning | daily submission, monitor |
+| 15–17 Aug | fix weakest evidence type; self-consistency; decide on venue-scoped full-text index | daily submission, monitor |
 | 18 Aug | freeze best config, full rerun, `test_extra` diagnostics for the paper | — |
 | 19 Aug | final submission early in the day (AoE deadline) | — |
 
