@@ -50,13 +50,44 @@ option -- there is no credit for abstaining.
 
 Reply with the option letter alone in `label`."""
 
-TABLE_SCHEMA_OUT = {
-    "type": "object",
-    "properties": {
-        "rows": {"type": "array", "items": {"type": "object"}},
-    },
-    "required": ["rows"],
-}
+#: JSON types per LitTraceQA column type.
+_JSON_TYPE = {"string": "string", "number": "number", "boolean": "boolean"}
+
+
+def table_response_schema(schema: list[dict[str, Any]]) -> dict[str, Any]:
+    """Response schema naming every column explicitly.
+
+    A generic ``{"type": "object"}`` for row items does not work: structured
+    output needs declared properties, and with none declared the model returns
+    rows with no fields -- which is how 9 of 11 validation table questions ended
+    up emitting a single all-null row. Naming the columns also pins their JSON
+    types, which the official validator checks (a number column must hold a
+    JSON number, not "2.05").
+    """
+    properties: dict[str, Any] = {}
+    for column in schema:
+        if not isinstance(column, dict):
+            continue
+        name = str(column.get("name", ""))
+        if name:
+            properties[name] = {
+                "type": _JSON_TYPE.get(str(column.get("type", "string")), "string"),
+                "nullable": True,
+            }
+    return {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": list(properties),
+                },
+            }
+        },
+        "required": ["rows"],
+    }
 
 TABLE_PROMPT = """Build the answer table for this question about scientific papers.
 
@@ -205,7 +236,7 @@ class AnswerSolver:
                 evidence=format_evidence(readings, titles),
                 types=types_note,
             ),
-            schema=TABLE_SCHEMA_OUT,
+            schema=table_response_schema(schema),
             max_output_tokens=2400,
             default=None,
         )
