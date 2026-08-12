@@ -26,11 +26,16 @@ from .retrieval.expand import ClusterExpander, predict_set_size
 from .retrieval.hybrid import HybridRetriever
 from .retrieval.lexical import BM25Index, NicknameIndex, extract_nicknames
 from .retrieval.scope import extract_scope
+from .retrieval.select import MentionAnchoredSelector
 
 
 @dataclass
 class PipelineConfig:
     # -- stage B/C
+    #: "fused" wins on validation's cluster regime; "mention_anchored" targets
+    #: the named-paper regime the test split almost certainly uses. See
+    #: retrieval/select.py and reports/retrieval_findings.md.
+    selection: str = "fused"
     candidate_k: int = 40
     use_dense: bool = True
     use_acronyms: bool = True
@@ -97,6 +102,9 @@ class Pipeline:
             if self.config.use_expansion and self.dense is not None
             else None
         )
+        self.selector = MentionAnchoredSelector(
+            pool, self.nicknames, self.acronyms or AcronymIndex(pool), self.bm25, self.dense
+        )
         self.reader = PaperReader(client) if client is not None else None
         self.solver = AnswerSolver(client, mc_samples=self.config.mc_samples) if client else None
 
@@ -130,6 +138,17 @@ class Pipeline:
                 ranked.insert(min(3, len(ranked)), paper_id)
 
         trace.candidates = ranked
+
+        if cfg.selection == "mention_anchored":
+            trace.paper_ids = self.selector.select(
+                question.question, trace.mentions, scope=trace.scope,
+                fallback_ranked=ranked, max_papers=cfg.max_set_size,
+            )
+            prediction = predict_set_size(question.question)
+            trace.predicted_size = len(trace.paper_ids)
+            trace.size_reason = f"mention-anchored ({prediction.reason})"
+            trace.seeds = trace.paper_ids
+            return trace
 
         prediction = predict_set_size(
             question.question, single_default=cfg.default_set_size

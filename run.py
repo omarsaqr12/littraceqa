@@ -47,6 +47,11 @@ def main() -> int:
     parser.add_argument("--no-read", action="store_true",
                         help="Skip PDF reading and answering; paper selection only")
     parser.add_argument("--no-expansion", action="store_true")
+    parser.add_argument("--selection", default="fused",
+                        choices=["fused", "mention_anchored"],
+                        help="fused = top-n of the RRF list (best on validation's "
+                             "cluster regime); mention_anchored = one paper per "
+                             "named artefact (targets the test regime)")
     parser.add_argument("--model", default=None, action="append", dest="models",
                         help="Model to use; repeat to set the rotation chain. "
                              "Free-tier quota is per model per day, so the "
@@ -78,6 +83,7 @@ def main() -> int:
             return 2
 
     config = PipelineConfig(
+        selection=args.selection,
         use_expansion=not args.no_expansion,
         max_papers_to_read=args.max_papers,
         mc_samples=args.mc_samples,
