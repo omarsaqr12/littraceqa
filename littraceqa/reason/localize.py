@@ -170,7 +170,7 @@ class PaperReader:
     #: Gemini's inline-data limit; larger PDFs go through the Files API.
     INLINE_LIMIT = 18 * 1024 * 1024
 
-    def __init__(self, client: GeminiClient, *, max_output_tokens: int = 1400):
+    def __init__(self, client: GeminiClient, *, max_output_tokens: int = 4096):
         self.client = client
         self.max_output_tokens = max_output_tokens
 

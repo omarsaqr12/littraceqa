@@ -86,10 +86,17 @@ class GeminiClient:
         max_retries: int = 5,
         cache_dir: Path = CACHE_DIR,
         temperature: float = 0.0,
+        thinking_budget: int | None = 0,
     ):
         self.model = model
         self.temperature = temperature
         self.max_retries = max_retries
+        # Current Flash models think by default, and thinking tokens are drawn
+        # from the same budget as the response: ask for 1400 tokens and you can
+        # get an *empty* body back with the whole budget spent reasoning. Every
+        # call here has a small, schema-constrained answer, so thinking buys
+        # little and costs reliability. None leaves the model's default alone.
+        self.thinking_budget = thinking_budget
         self.limiter = RateLimiter(rpm)
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -163,6 +170,13 @@ class GeminiClient:
         if schema is not None:
             config["response_mime_type"] = "application/json"
             config["response_schema"] = schema
+        if self.thinking_budget is not None:
+            try:
+                config["thinking_config"] = types.ThinkingConfig(
+                    thinking_budget=self.thinking_budget
+                )
+            except Exception:
+                pass  # older SDK or a model without thinking -- default is fine
 
         last_error: Exception | None = None
         for attempt in range(self.max_retries):
@@ -174,21 +188,34 @@ class GeminiClient:
                     config=types.GenerateContentConfig(**config),
                 )
                 text = response.text or ""
-                self.usage.record(model)
-                if use_cache:
-                    path.write_text(
-                        json.dumps({"text": text, "model": model}, ensure_ascii=False),
-                        encoding="utf-8",
-                    )
-                return text
             except Exception as exc:  # noqa: BLE001 -- provider raises many shapes
                 last_error = exc
                 self.usage.errors += 1
                 message = str(exc).lower()
-                fatal = any(k in message for k in ("api key", "permission", "not found"))
-                if fatal or attempt == self.max_retries - 1:
+                if any(k in message for k in ("api key", "permission", "not found")):
+                    break
+                if attempt == self.max_retries - 1:
                     break
                 time.sleep(min(2**attempt + random.random(), 45.0))
+                continue
+
+            self.usage.record(model)
+            if not text.strip():
+                # Budget exhausted (usually by thinking) or a safety stop. Retry
+                # with more room rather than caching an empty body forever.
+                self.usage.errors += 1
+                last_error = RuntimeError("empty response body")
+                config["max_output_tokens"] = min(int(config["max_output_tokens"] * 2), 16384)
+                if attempt == self.max_retries - 1:
+                    break
+                continue
+
+            if use_cache:
+                path.write_text(
+                    json.dumps({"text": text, "model": model}, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            return text
 
         raise RuntimeError(f"Gemini call failed after {self.max_retries} attempts: {last_error}")
 
