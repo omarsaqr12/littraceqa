@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from dotenv import load_dotenv
 
 from littraceqa.answer.build import validate_records
-from littraceqa.corpus import DATA_DIR, PaperPool, load_questions, write_jsonl
+from littraceqa.corpus import DATA_DIR, PaperPool, load_questions, read_jsonl, write_jsonl
 from littraceqa.pdf.fetch import PDFFetcher
 from littraceqa.pipeline import Pipeline, PipelineConfig
 from littraceqa.reason.client import GeminiClient
@@ -62,6 +62,10 @@ def main() -> int:
     parser.add_argument("--mc-samples", type=int, default=3,
                         help="Self-consistency samples for multiple choice")
     parser.add_argument("--trace", default=None, help="Write per-question traces here")
+    parser.add_argument("--no-resume", action="store_true",
+                        help="Ignore any existing .partial.jsonl and start fresh")
+    parser.add_argument("--timeout", type=float, default=240.0,
+                        help="Per-request API timeout in seconds")
     args = parser.parse_args()
 
     load_dotenv(ROOT / ".env")
@@ -75,7 +79,8 @@ def main() -> int:
 
     client = None
     if not args.no_read:
-        client = GeminiClient(model=args.models, rpm=args.rpm)
+        client = GeminiClient(model=args.models, rpm=args.rpm,
+                              timeout_seconds=args.timeout)
         if not client.available:
             print("ERROR: GEMINI_API_KEY is not set.\n"
                   "  Get a free key at https://aistudio.google.com/apikey, put it in .env,\n"
@@ -91,9 +96,27 @@ def main() -> int:
     print("building indices ...", flush=True)
     pipeline = Pipeline(pool, config=config, client=client, fetcher=PDFFetcher())
 
+    out_path = Path(args.out or f"preds/{args.split}.jsonl")
+    partial_path = out_path.with_suffix(".partial.jsonl")
+
+    # Resume: a power cut and a hung API call have each already cost a full run,
+    # so completed questions are appended to disk as they finish and reloaded on
+    # restart. The LLM disk cache makes re-running cheap, but not free.
+    done: dict[str, dict] = {}
+    if partial_path.exists() and not args.no_resume:
+        for row in read_jsonl(partial_path):
+            if isinstance(row, dict) and row.get("query_id"):
+                done[row["query_id"]] = row
+        print(f"resuming: {len(done)} questions already done in {partial_path}")
+
     records, traces = [], []
     started = time.time()
+    partial_path.parent.mkdir(parents=True, exist_ok=True)
+    partial = partial_path.open("a", encoding="utf-8")
     for index, question in enumerate(questions, start=1):
+        if question.query_id in done:
+            records.append(done[question.query_id])
+            continue
         try:
             record, trace = pipeline.run_question(question)
         except Exception as exc:  # keep going: a partial file still scores
@@ -103,6 +126,8 @@ def main() -> int:
             record = build_record(question, [], [], {})
             trace = None
         records.append(record)
+        partial.write(json.dumps(record, ensure_ascii=False) + "\n")
+        partial.flush()
         if trace is not None:
             traces.append({
                 "query_id": trace.query_id,
@@ -123,7 +148,7 @@ def main() -> int:
             print(f"  {index}/{len(questions)}  {rate:.1f}s/question"
                   + (f"  {client.usage}" if client else ""), flush=True)
 
-    out_path = Path(args.out or f"preds/{args.split}.jsonl")
+    partial.close()
     write_jsonl(records, out_path)
     print(f"\nwrote {len(records)} records -> {out_path}")
 

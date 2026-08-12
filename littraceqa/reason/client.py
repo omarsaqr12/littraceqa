@@ -112,7 +112,12 @@ class GeminiClient:
         cache_dir: Path = CACHE_DIR,
         temperature: float = 0.0,
         thinking_budget: int | None = 0,
+        timeout_seconds: float = 240.0,
     ):
+        # Without an explicit timeout the SDK will wait indefinitely. Observed:
+        # a run sat 9 minutes on one ESTABLISHED connection having completed
+        # zero questions. A hung call must fail and retry, not stall the run.
+        self.timeout_seconds = timeout_seconds
         chain = model if isinstance(model, list) else ([model] if model else DEFAULT_MODEL_CHAIN)
         self.model_chain = list(dict.fromkeys(chain))
         self.model = self.model_chain[0]
@@ -149,8 +154,14 @@ class GeminiClient:
                     "GEMINI_API_KEY is not set. Copy .env.example to .env and fill it in."
                 )
             from google import genai
+            from google.genai import types
 
-            self._client = genai.Client(api_key=self._api_key)
+            self._client = genai.Client(
+                api_key=self._api_key,
+                http_options=types.HttpOptions(
+                    timeout=int(self.timeout_seconds * 1000)  # milliseconds
+                ),
+            )
         return self._client
 
     # -- cache ---------------------------------------------------------------
@@ -302,6 +313,18 @@ class GeminiClient:
                 if any(k in lowered for k in ("api key", "permission", "not found")):
                     return None, exc
                 if "429" in message or "resource_exhausted" in lowered:
+                    # Billing exhaustion is project-wide and permanent until the
+                    # account is topped up: no model rotation or backoff helps.
+                    # Treated as terminal, because the retry ladder times 5
+                    # attempts by 3 models by a 60s sleep = ~15 minutes burned
+                    # per call before the run makes any progress.
+                    if any(k in lowered for k in ("prepayment", "credits", "billing")):
+                        self.exhausted.update(self.model_chain)
+                        raise QuotaExhausted(
+                            "Gemini billing credits are depleted for this API key. "
+                            "Top up at https://ai.studio, or use a free-tier key "
+                            "(a project with no billing attached)."
+                        ) from exc
                     if "perday" in lowered.replace("_", "").replace("-", ""):
                         self.exhausted.add(model)
                         return None, exc
