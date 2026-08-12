@@ -27,6 +27,8 @@ from littraceqa.retrieval.dense import DenseRetriever
 from littraceqa.retrieval.expand import predict_set_size
 from littraceqa.retrieval.rerank import CrossEncoderReranker
 
+MODEL = sys.argv[1] if len(sys.argv) > 1 else "BAAI/bge-reranker-base"
+
 pool = PaperPool.load()
 dense = DenseRetriever(pool)
 dense.build(show_progress=False)
@@ -38,7 +40,8 @@ gold = load_gold()
 print("generating candidates ...", flush=True)
 traces = {q.query_id: pipeline.select_papers(q) for q in questions}
 
-reranker = CrossEncoderReranker(pool)
+reranker = CrossEncoderReranker(pool, MODEL)
+print(f"reranker: {MODEL}", flush=True)
 
 
 def evaluate_policy(ordering: dict[str, list[str]], label: str) -> None:
@@ -63,24 +66,35 @@ print(f"\n{'ordering':<34} {'P@1':>7} {'F1(n=1)':>9} {'F1(pred)':>9} {'single':>
 print("-" * 82)
 evaluate_policy({qid: t.candidates for qid, t in traces.items()}, "baseline (RRF fusion)")
 
+# The cross-encoder pass is the expensive part and does NOT depend on
+# prior_weight -- that is a post-hoc rank blend. Score once per mode, then sweep
+# the blend in pure Python. (Scoring per weight made this experiment time out.)
 for mode in ("question", "per_mention"):
+    started = time.time()
+    scored: dict[str, list[tuple[str, int]]] = {}
+    for q in questions:
+        reranker.prior_weight = 0.0  # pure model order; blending happens below
+        ranked = reranker.rerank(
+            q.question,
+            traces[q.query_id].candidates,
+            mentions=traces[q.query_id].mentions,
+            mode=mode,
+        )
+        scored[q.query_id] = [(c.paper.paper_id, c.prior_rank) for c in ranked]
+    elapsed = (time.time() - started) / len(questions)
+
     for prior_weight in (0.0, 0.25, 0.5):
-        reranker.prior_weight = prior_weight
-        started = time.time()
-        ordering = {
-            q.query_id: [
-                c.paper.paper_id
-                for c in reranker.rerank(
-                    q.question,
-                    traces[q.query_id].candidates,
-                    mentions=traces[q.query_id].mentions,
-                    mode=mode,
-                )
+        ordering = {}
+        for query_id, entries in scored.items():
+            blended = [
+                (paper_id,
+                 (1 - prior_weight) / (1 + new_rank) + prior_weight / (1 + prior_rank))
+                for new_rank, (paper_id, prior_rank) in enumerate(entries)
             ]
-            for q in questions
-        }
+            blended.sort(key=lambda kv: -kv[1])
+            ordering[query_id] = [paper_id for paper_id, _ in blended]
         evaluate_policy(ordering, f"rerank {mode}, prior={prior_weight:.2f}"
-                                 f" ({(time.time()-started)/len(questions):.1f}s/q)")
+                                 + (f" ({elapsed:.1f}s/q)" if prior_weight == 0.0 else ""))
 
 # Ceiling, unchanged by reranking -- it depends only on candidate recall.
 oracle = [

@@ -47,7 +47,10 @@ def main() -> int:
     parser.add_argument("--no-read", action="store_true",
                         help="Skip PDF reading and answering; paper selection only")
     parser.add_argument("--no-expansion", action="store_true")
-    parser.add_argument("--model", default="gemini-flash-latest")
+    parser.add_argument("--model", default=None, action="append", dest="models",
+                        help="Model to use; repeat to set the rotation chain. "
+                             "Free-tier quota is per model per day, so the "
+                             "default chain is what makes a full run possible.")
     parser.add_argument("--rpm", type=int, default=8, help="Client-side requests/minute cap")
     parser.add_argument("--max-papers", type=int, default=3,
                         help="PDFs read per question (API budget)")
@@ -67,7 +70,7 @@ def main() -> int:
 
     client = None
     if not args.no_read:
-        client = GeminiClient(model=args.model, rpm=args.rpm)
+        client = GeminiClient(model=args.models, rpm=args.rpm)
         if not client.available:
             print("ERROR: GEMINI_API_KEY is not set.\n"
                   "  Get a free key at https://aistudio.google.com/apikey, put it in .env,\n"
