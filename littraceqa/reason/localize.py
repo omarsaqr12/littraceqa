@@ -167,9 +167,6 @@ def normalize_object_id(value: Any, source_type: str) -> str:
 class PaperReader:
     """One LLM call per (question, paper), with the whole PDF as context."""
 
-    #: Gemini's inline-data limit; larger PDFs go through the Files API.
-    INLINE_LIMIT = 18 * 1024 * 1024
-
     def __init__(self, client: GeminiClient, *, max_output_tokens: int = 4096):
         self.client = client
         self.max_output_tokens = max_output_tokens
@@ -181,12 +178,6 @@ class PaperReader:
             data = pdf_path.read_bytes()
         except OSError as exc:
             return Reading(paper.paper_id, False, "", "", 0.0, error=f"unreadable pdf: {exc}")
-        if len(data) > self.INLINE_LIMIT:
-            return Reading(
-                paper.paper_id, False, "", "", 0.0,
-                error=f"pdf too large for inline upload ({len(data) // 1024 // 1024}MB)",
-            )
-
         prompt = PROMPT.format(
             paper_id=paper.paper_id,
             title=clean(paper.title),

@@ -120,6 +120,8 @@ class GeminiClient:
         self.exhausted: set[str] = set()
         #: Models that reject `thinking_config` outright (flash-lite 400s on it).
         self._no_thinking: set[str] = set()
+        #: Files API handles for oversized attachments, keyed by attachment id.
+        self._uploads: dict[str, Any] = {}
         self.temperature = temperature
         self.max_retries = max_retries
         # Current Flash models think by default, and thinking tokens are drawn
@@ -167,6 +169,42 @@ class GeminiClient:
             digest.update(json.dumps(schema, sort_keys=True, default=str).encode())
         return self.cache_dir / f"{digest.hexdigest()[:32]}.json"
 
+    # -- attachments ---------------------------------------------------------
+
+    #: Inline request bodies are capped around 20MB. 12% of the papers in this
+    #: corpus exceed it (ICLR camera-readies with large figures reach 40MB), so
+    #: those go through the Files API instead of being dropped.
+    INLINE_LIMIT = 15 * 1024 * 1024
+
+    def _attachment_part(self, attachment: Attachment):
+        from google.genai import types
+
+        if len(attachment.data) <= self.INLINE_LIMIT:
+            return types.Part.from_bytes(
+                data=attachment.data, mime_type=attachment.mime_type
+            )
+
+        key = attachment.cache_key()
+        handle = self._uploads.get(key)
+        if handle is None:
+            import io
+
+            handle = self.client.files.upload(
+                file=io.BytesIO(attachment.data),
+                config={"mime_type": attachment.mime_type},
+            )
+            # An uploaded file is unusable until it finishes processing.
+            deadline = time.time() + 180
+            while getattr(handle.state, "name", str(handle.state)) == "PROCESSING":
+                if time.time() > deadline:
+                    raise RuntimeError(f"file upload stuck in PROCESSING: {key}")
+                time.sleep(2)
+                handle = self.client.files.get(name=handle.name)
+            if getattr(handle.state, "name", str(handle.state)) == "FAILED":
+                raise RuntimeError(f"file upload failed: {key}")
+            self._uploads[key] = handle
+        return types.Part.from_uri(file_uri=handle.uri, mime_type=attachment.mime_type)
+
     # -- generation ----------------------------------------------------------
 
     def generate(
@@ -189,9 +227,7 @@ class GeminiClient:
 
         from google.genai import types
 
-        parts: list[Any] = [
-            types.Part.from_bytes(data=a.data, mime_type=a.mime_type) for a in attachments
-        ]
+        parts: list[Any] = [self._attachment_part(a) for a in attachments]
         parts.append(types.Part.from_text(text=prompt))
 
         config: dict[str, Any] = {

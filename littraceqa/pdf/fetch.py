@@ -122,7 +122,9 @@ class PDFFetcher:
         if client is None or not paper.openreview_id:
             return False
         try:
-            data = client.get_attachment(paper.openreview_id, "pdf")
+            # Signature is get_attachment(field_name, id=...) -- passing these
+            # positionally reads the note id as the field name and 404s.
+            data = client.get_attachment(field_name="pdf", id=paper.openreview_id)
             if data and _looks_like_pdf(data):
                 dest.write_bytes(data)
                 return True
