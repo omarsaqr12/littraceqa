@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -36,6 +38,30 @@ SPLITS = {
     "test": "test.jsonl",
     "test_extra": "test_extra.jsonl",
 }
+
+
+@contextmanager
+def question_deadline(seconds: float, query_id: str):
+    """Abandon a question after `seconds`, whatever it is blocked on.
+
+    Uses SIGALRM rather than a thread because the observed hangs are inside
+    blocking C-level socket reads, which a `concurrent.futures` timeout cannot
+    interrupt -- it would leak the thread and still stall the run.
+    """
+    if seconds <= 0 or not hasattr(signal, "SIGALRM"):
+        yield
+        return
+
+    def _fire(signum, frame):
+        raise TimeoutError(f"{query_id}: exceeded {seconds:.0f}s budget")
+
+    previous = signal.signal(signal.SIGALRM, _fire)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def main() -> int:
@@ -66,6 +92,8 @@ def main() -> int:
                         help="Ignore any existing .partial.jsonl and start fresh")
     parser.add_argument("--timeout", type=float, default=240.0,
                         help="Per-request API timeout in seconds")
+    parser.add_argument("--question-timeout", type=float, default=420.0,
+                        help="Hard per-question budget in seconds; 0 disables")
     args = parser.parse_args()
 
     load_dotenv(ROOT / ".env")
@@ -118,7 +146,14 @@ def main() -> int:
             records.append(done[question.query_id])
             continue
         try:
-            record, trace = pipeline.run_question(question)
+            # Hard watchdog. Library-level timeouts have repeatedly failed to
+            # bound a call -- the SDK's http_options timeout does not cover
+            # every path, and a run was observed frozen with zero CPU on an
+            # ESTABLISHED connection. SIGALRM interrupts the blocking syscall
+            # itself, so a question can always be abandoned and the run
+            # continues. The partial file keeps whatever completed.
+            with question_deadline(args.question_timeout, question.query_id):
+                record, trace = pipeline.run_question(question)
         except Exception as exc:  # keep going: a partial file still scores
             print(f"  [{question.query_id}] FAILED: {exc}", file=sys.stderr)
             from littraceqa.answer.build import build_record
@@ -166,9 +201,11 @@ def main() -> int:
 
     gold_path = DATA_DIR / "validation.jsonl"
     if args.split == "validation" and gold_path.exists():
-        from evaluate import evaluate, read_jsonl
+        # Aliased: a bare `read_jsonl` here would shadow the module-level import
+        # for the whole function, breaking the resume path above.
+        from evaluate import evaluate, read_jsonl as read_gold_jsonl
 
-        gold = read_jsonl(gold_path)
+        gold = read_gold_jsonl(gold_path)
         if args.limit:
             keep = {q.query_id for q in questions}
             gold = [g for g in gold if g["query_id"] in keep]
