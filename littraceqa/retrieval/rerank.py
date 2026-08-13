@@ -25,9 +25,12 @@ from dataclasses import dataclass
 from ..corpus import Paper, PaperPool
 from ..textnorm import clean
 
-#: Strong general-purpose reranker. `bge-reranker-base` is ~3x faster with a
-#: modest quality drop; `ms-marco-MiniLM-L-6-v2` is faster still.
-DEFAULT_MODEL = "BAAI/bge-reranker-v2-m3"
+#: This is the model exp/08 actually measured (paper F1 0.410 -> 0.490). The
+#: larger `bge-reranker-v2-m3` was the default here for a while but was never
+#: benchmarked, and it is far too slow for this pipeline: 40 candidates took
+#: over 300s per question, blowing the run's watchdog before a single API call.
+#: Do not raise this to v2-m3 without re-measuring both quality *and* latency.
+DEFAULT_MODEL = "BAAI/bge-reranker-base"
 
 
 @dataclass(slots=True)
@@ -61,12 +64,30 @@ class CrossEncoderReranker:
         self._device = device
         self._model = None
 
+    #: Below this much free VRAM, load on CPU instead. A GPU shared with another
+    #: workload is far worse than no GPU: with ~3GB free, one rerank of 40
+    #: candidates took over 300s, versus ~25s on CPU.
+    MIN_FREE_VRAM_BYTES = 4 * 1024**3
+
+    def _pick_device(self) -> str:
+        if self._device is not None:
+            return self._device
+        try:
+            import torch
+
+            if not torch.cuda.is_available():
+                return "cpu"
+            free, _total = torch.cuda.mem_get_info()
+            return "cuda" if free >= self.MIN_FREE_VRAM_BYTES else "cpu"
+        except Exception:
+            return "cpu"
+
     @property
     def model(self):
         if self._model is None:
             from sentence_transformers import CrossEncoder
 
-            self._model = CrossEncoder(self.model_name, device=self._device)
+            self._model = CrossEncoder(self.model_name, device=self._pick_device())
         return self._model
 
     def _document(self, paper: Paper) -> str:
