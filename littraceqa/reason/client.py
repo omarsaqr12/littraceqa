@@ -188,33 +188,25 @@ class GeminiClient:
     INLINE_LIMIT = 15 * 1024 * 1024
 
     def _attachment_part(self, attachment: Attachment):
+        """Always inline. Callers shrink oversized PDFs before getting here.
+
+        The Files API is the documented path for large attachments and it is
+        deliberately not used: it hung repeatedly, leaving the process with 100
+        threads and no CPU growth, and the SIGALRM watchdog could not clear it
+        because the block sat in SDK worker threads. `pdf.read.shrink_pdf`
+        rasterises papers under the inline limit instead, which removes the
+        failure mode entirely.
+        """
         from google.genai import types
 
-        if len(attachment.data) <= self.INLINE_LIMIT:
-            return types.Part.from_bytes(
-                data=attachment.data, mime_type=attachment.mime_type
+        if len(attachment.data) > self.INLINE_LIMIT:
+            raise ValueError(
+                f"attachment {attachment.cache_key()} is "
+                f"{len(attachment.data) // 1024 // 1024}MB, over the "
+                f"{self.INLINE_LIMIT // 1024 // 1024}MB inline limit; "
+                "shrink it before sending (see pdf.read.shrink_pdf)"
             )
-
-        key = attachment.cache_key()
-        handle = self._uploads.get(key)
-        if handle is None:
-            import io
-
-            handle = self.client.files.upload(
-                file=io.BytesIO(attachment.data),
-                config={"mime_type": attachment.mime_type},
-            )
-            # An uploaded file is unusable until it finishes processing.
-            deadline = time.time() + 180
-            while getattr(handle.state, "name", str(handle.state)) == "PROCESSING":
-                if time.time() > deadline:
-                    raise RuntimeError(f"file upload stuck in PROCESSING: {key}")
-                time.sleep(2)
-                handle = self.client.files.get(name=handle.name)
-            if getattr(handle.state, "name", str(handle.state)) == "FAILED":
-                raise RuntimeError(f"file upload failed: {key}")
-            self._uploads[key] = handle
-        return types.Part.from_uri(file_uri=handle.uri, mime_type=attachment.mime_type)
+        return types.Part.from_bytes(data=attachment.data, mime_type=attachment.mime_type)
 
     # -- generation ----------------------------------------------------------
 

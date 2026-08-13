@@ -143,6 +143,51 @@ def load_text(paper_id: str, path: Path) -> PaperText | None:
     return PaperText(paper_id=paper_id, path=path, pages=pages)
 
 
+#: Ladder of (dpi, jpeg quality) tried by `shrink_pdf`, best first. 150 DPI
+#: keeps body text and axis labels legible to a vision model.
+_SHRINK_LADDER = ((150, 75), (120, 70), (100, 60), (80, 50))
+
+
+def shrink_pdf(data: bytes, limit: int) -> bytes:
+    """Rasterise a PDF down under `limit` bytes, or return it unchanged.
+
+    Exists to keep every paper on the *inline* upload path. The Files API is the
+    documented route for large attachments, but in practice it hung: a run froze
+    with 100 threads and zero CPU growth, and a SIGALRM watchdog could not clear
+    it because the block was inside SDK worker threads, not the main thread.
+
+    Lossless recompression is useless here -- scientific PDFs are already
+    image-compressed (39.8MB -> 39.0MB). Re-rendering pages as downsampled JPEGs
+    is what actually works (39.8MB -> 9.45MB at 150 DPI). The cost is the text
+    layer, so the model reads the page visually rather than extracting glyphs;
+    for this task the page is being read visually regardless.
+    """
+    if len(data) <= limit:
+        return data
+    try:
+        source = pymupdf.open(stream=data, filetype="pdf")
+    except Exception:
+        return data
+    try:
+        for dpi, quality in _SHRINK_LADDER:
+            out = pymupdf.open()
+            try:
+                for page in source:
+                    image = page.get_pixmap(dpi=dpi).tobytes("jpeg", jpg_quality=quality)
+                    new_page = out.new_page(width=page.rect.width, height=page.rect.height)
+                    new_page.insert_image(page.rect, stream=image)
+                candidate = out.tobytes(garbage=4, deflate=True)
+            finally:
+                out.close()
+            if len(candidate) <= limit:
+                return candidate
+        return candidate  # smallest rung; caller decides what to do
+    except Exception:
+        return data
+    finally:
+        source.close()
+
+
 def render_page(path: Path, page: int, zoom: float = 2.0) -> bytes | None:
     """PNG of one page, for the vision path (`localize.py` D2/D4)."""
     try:

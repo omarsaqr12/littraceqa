@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from ..corpus import Paper, Question
+from ..pdf.read import shrink_pdf
 from ..textnorm import clean
 from .client import Attachment, GeminiClient
 
@@ -178,6 +179,11 @@ class PaperReader:
             data = pdf_path.read_bytes()
         except OSError as exc:
             return Reading(paper.paper_id, False, "", "", 0.0, error=f"unreadable pdf: {exc}")
+        # Keep every paper on the inline upload path; the Files API hangs.
+        data = shrink_pdf(data, self.client.INLINE_LIMIT)
+        if len(data) > self.client.INLINE_LIMIT:
+            return Reading(paper.paper_id, False, "", "", 0.0,
+                           error=f"pdf still {len(data)//1024//1024}MB after shrinking")
         prompt = PROMPT.format(
             paper_id=paper.paper_id,
             title=clean(paper.title),
