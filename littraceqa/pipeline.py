@@ -26,6 +26,7 @@ from .retrieval.expand import ClusterExpander, predict_set_size
 from .retrieval.hybrid import HybridRetriever
 from .retrieval.lexical import BM25Index, NicknameIndex, extract_nicknames
 from .retrieval.scope import extract_scope
+from .retrieval.rerank import CrossEncoderReranker
 from .retrieval.select import MentionAnchoredSelector
 
 
@@ -37,6 +38,15 @@ class PipelineConfig:
     #: retrieval/select.py and reports/retrieval_findings.md.
     selection: str = "fused"
     candidate_k: int = 40
+    #: Cross-encoder rerank of the candidate list. MEASURED WIN (exp/08):
+    #: paper F1 0.410 -> 0.490, and single-paper 0.692 -> 0.846, which is the
+    #: family the test regime resembles. Local and free; ~25s/question on CPU.
+    use_reranker: bool = False
+    #: "question" scores (full question, title+abstract). Do NOT use
+    #: "per_mention": measured at 0.396, *below* the 0.410 baseline -- a bare
+    #: artefact name gives the cross-encoder too little context.
+    rerank_mode: str = "question"
+    rerank_prior_weight: float = 0.5
     use_dense: bool = True
     use_acronyms: bool = True
     #: Expand the paper set along the embedding graph. MEASURED AND DISABLED:
@@ -102,6 +112,9 @@ class Pipeline:
             if self.config.use_expansion and self.dense is not None
             else None
         )
+        self.reranker = CrossEncoderReranker(
+            pool, prior_weight=self.config.rerank_prior_weight
+        ) if self.config.use_reranker else None
         self.selector = MentionAnchoredSelector(
             pool, self.nicknames, self.acronyms or AcronymIndex(pool), self.bm25, self.dense
         )
@@ -136,6 +149,15 @@ class Pipeline:
                 if paper_id in ranked:
                     ranked.remove(paper_id)
                 ranked.insert(min(3, len(ranked)), paper_id)
+
+        if self.reranker is not None and ranked:
+            ranked = [
+                c.paper.paper_id
+                for c in self.reranker.rerank(
+                    question.question, ranked,
+                    mentions=trace.mentions, mode=cfg.rerank_mode,
+                )
+            ]
 
         trace.candidates = ranked
 

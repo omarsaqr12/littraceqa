@@ -73,6 +73,9 @@ def main() -> int:
     parser.add_argument("--no-read", action="store_true",
                         help="Skip PDF reading and answering; paper selection only")
     parser.add_argument("--no-expansion", action="store_true")
+    parser.add_argument("--rerank", action="store_true",
+                        help="Cross-encoder rerank of candidates (exp/08: paper "
+                             "F1 0.410 -> 0.490, single-paper 0.692 -> 0.846)")
     parser.add_argument("--selection", default="fused",
                         choices=["fused", "mention_anchored"],
                         help="fused = top-n of the RRF list (best on validation's "
@@ -117,6 +120,7 @@ def main() -> int:
 
     config = PipelineConfig(
         selection=args.selection,
+        use_reranker=args.rerank,
         use_expansion=not args.no_expansion,
         max_papers_to_read=args.max_papers,
         mc_samples=args.mc_samples,
