@@ -20,7 +20,7 @@ from typing import Any
 from ..corpus import Paper, Question
 from ..textnorm import clean
 from .client import GeminiClient
-from .localize import Reading
+from .localize import Reading, _clean_label
 
 MC_SCHEMA = {
     "type": "object",
@@ -162,6 +162,16 @@ class AnswerSolver:
         if not options:
             return "A"
         labels = sorted(options)
+
+        # The reader was shown the options alongside the PDF (localize.OPTIONS_BLOCK),
+        # so the labels below were chosen with the paper in hand. Voting on them
+        # is both better-informed and free: the prompt-based path underneath
+        # re-decides from a text digest that has already thrown the PDF away, and
+        # costs `mc_samples` calls a question on a 20-request/day budget.
+        read_votes = Counter(r.label for r in readings if r.label in options)
+        if read_votes:
+            return read_votes.most_common(1)[0][0]
+
         prompt = MC_PROMPT.format(
             question=question.question,
             options="\n".join(f"  {label}. {options[label]}" for label in labels),
@@ -276,12 +286,6 @@ def _is_title_column(name: str) -> bool:
     return bool(_TITLE_COLUMN.search(name or ""))
 
 
-def _clean_label(value: Any) -> str:
-    text = str(value or "").strip().upper()
-    match = re.search(r"\b([A-Z])\b", text)
-    return match.group(1) if match else text[:1]
-
-
 def _complete_row(row: dict[str, Any], schema: list[dict[str, Any]]) -> dict[str, Any]:
     """Force a row to carry exactly the schema's columns with the right types.
 
@@ -338,4 +342,8 @@ def _fallback_label(
         best = max(labels, key=lambda l: fuzz.partial_ratio(extracted.lower(),
                                                             str(options[l]).lower()))
         return best
-    return labels[0]
+    # Nothing to match against. Never return labels[0]: "A" is gold on 4.9% of
+    # validation MC questions versus 25% for a uniform guess.
+    from ..answer.build import deterministic_label
+
+    return deterministic_label(question.query_id, labels)

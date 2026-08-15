@@ -17,6 +17,7 @@ failing validation at submission time.
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from ..corpus import Question
@@ -25,6 +26,26 @@ ALLOWED_LOCATOR_KEYS = {
     "page", "table_id", "figure_id", "section", "equation_id", "algorithm_id", "citation_id",
 }
 SOURCE_TYPES = {"table", "figure", "text_span", "equation_algorithm", "citation_context"}
+
+
+def deterministic_label(query_id: str, labels: list[str]) -> str:
+    """A reproducible uniform pick among `labels`, for when solving failed.
+
+    The previous fallback was `sorted(options)[0]`, i.e. always "A". That is the
+    single worst constant available: validation gold labels run A=2, B=17, C=11,
+    D=11, so "A" is the correct answer 4.9% of the time against 25% for a blind
+    guess. `test_v2_rerank.jsonl` emitted A on 16 of 71 questions, most of them
+    solver failures, so this was live and costing points.
+
+    Uniform rather than "always B" on purpose: B wins on 41 validation samples,
+    but that is a property of one small annotated split, and a constant that
+    happens to fit it does not transfer. Uniform earns 25% against any gold
+    distribution. Seeded on `query_id` so a rerun reproduces exactly.
+    """
+    if not labels:
+        return "A"
+    digest = hashlib.sha256(str(query_id).encode()).digest()
+    return sorted(labels)[int.from_bytes(digest[:8], "big") % len(labels)]
 
 
 def clean_locator(locator: dict[str, Any]) -> dict[str, Any]:
@@ -92,7 +113,7 @@ def build_record(
         options = question.multiple_choice_options or {}
         label = str(answer_parts.get("multiple_choice") or "").strip().upper()
         if label not in options:
-            label = sorted(options)[0] if options else "A"
+            label = deterministic_label(question.query_id, sorted(options))
         answer["multiple_choice"] = {"gold": label}
 
     if "table" in types:

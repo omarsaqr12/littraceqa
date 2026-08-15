@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from ..corpus import Paper, Question
+from ..pdf.objects import EvidenceCandidate, format_candidates
 from ..pdf.read import shrink_pdf
 from ..textnorm import clean
 from .client import Attachment, GeminiClient
@@ -61,6 +62,24 @@ READ_SCHEMA = {
     "required": ["found", "answer", "confidence", "evidence"],
 }
 
+#: Used instead of READ_SCHEMA when a candidate locator list is available. The
+#: model picks indices into a list built from the PDF rather than generating a
+#: page number and an object id of its own -- see `littraceqa/pdf/objects.py`.
+#: The free-form `evidence` array is kept as a fallback for an out-of-range pick.
+READ_SCHEMA_INDEXED = {
+    "type": "object",
+    "properties": {
+        "found": {"type": "boolean"},
+        "answer": {"type": "string"},
+        "quote": {"type": "string"},
+        "confidence": {"type": "number"},
+        "label": {"type": "string"},
+        "evidence_index": {"type": "array", "items": {"type": "integer"}},
+        "evidence": READ_SCHEMA["properties"]["evidence"],
+    },
+    "required": ["found", "answer", "confidence", "evidence_index"],
+}
+
 PROMPT = """You are reading one paper from a scientific-literature QA benchmark.
 
 PAPER
@@ -89,14 +108,48 @@ Rules for the evidence you report:
 - Report one evidence item per distinct location the answer needs. Usually one.
   Do not pad the list; precision is graded as well as recall.
 
-If this paper does not contain the answer, set found=false, answer="", and
-evidence=[]. Do not guess, and do not use knowledge from outside the PDF.
+Always name the single most likely location, even when you are unsure. There is
+no credit for abstaining: the scorer gives an empty evidence list exactly the
+same zero as a wrong one, so a low-confidence guess is free upside. If you cannot
+find the answer, set found=false but still report your best guess at the location
+in `evidence` and say how unsure you are in `confidence`. Never return an empty
+`evidence` list. Do not use knowledge from outside the PDF.
 
 `answer` must be the value alone, with no explanation: "14.70", "Freda Shi",
 "8", "a single NVIDIA RTX 4090 GPU".
 `quote` is the sentence or cell text you read it from.
 `confidence` is 0.0-1.0 for how certain you are.
 """
+
+#: Appended to either prompt when the question is multiple choice. Asking for the
+#: label in the *same* call as the read is what stops the answer being laundered
+#: through a text digest: the previous two-call path had the reader extract a
+#: value while blind to the options, then had the solver pick an option while
+#: blind to the PDF.
+OPTIONS_BLOCK = """
+
+MULTIPLE-CHOICE OPTIONS
+{options}
+
+Also set `label` to the letter of the option your reading supports. Judge the
+options against what this PDF actually says, not against your recollection.
+Commit to a letter even if the match is imperfect -- there is no credit for
+abstaining. If this paper genuinely cannot settle the question, still give the
+closest letter and lower `confidence`."""
+
+CANDIDATES_BLOCK = """
+
+CANDIDATE LOCATIONS IN THIS PDF
+These were extracted mechanically from the PDF: the page numbers are exact and
+the object labels are the ones actually printed in it.
+
+{candidates}
+
+Set `evidence_index` to the indices of the entries the answer comes from --
+usually one, and never more than you need, since precision is graded too. Choose
+the most specific entry that fits: prefer the table/figure/equation the value is
+printed in over the page's prose entry. Only fall back to the free-form
+`evidence` field if no entry above fits at all."""
 
 
 @dataclass(slots=True)
@@ -108,9 +161,28 @@ class Reading:
     confidence: float
     evidence: list[dict[str, Any]] = field(default_factory=list)
     error: str = ""
+    #: Multiple-choice label, when the reader was given the options (see
+    #: OPTIONS_BLOCK). Empty when it was not asked.
+    label: str = ""
+    #: Locators enumerated from the PDF, and the model's picks into that list.
+    #: When both are present the locator is built from the PDF, not from model
+    #: output -- the page is then exact by construction.
+    candidates: list[EvidenceCandidate] = field(default_factory=list)
+    evidence_index: list[int] = field(default_factory=list)
 
     def to_evidence_records(self, trust_pages: bool = True) -> list[dict[str, Any]]:
         """Schema-exact evidence records for the submission file."""
+        # Preferred path: the model picked entries out of a list we built from
+        # the PDF, so page and object id are both transcriptions rather than
+        # generations. Falls through to the free-form path when no pick is valid.
+        picked = [
+            self.candidates[i]
+            for i in self.evidence_index
+            if isinstance(i, int) and 0 <= i < len(self.candidates)
+        ]
+        if picked:
+            return [c.to_evidence_record(self.paper_id) for c in picked]
+
         records = []
         for item in self.evidence:
             source_type = str(item.get("source_type") or "").strip()
@@ -140,6 +212,15 @@ _CANONICAL = {
     "equation": "Equation", "eq": "Equation",
     "algorithm": "Algorithm", "alg": "Algorithm",
 }
+
+
+def _clean_label(value: Any) -> str:
+    """First standalone capital letter in the model's answer ("(C)" -> "C")."""
+    text = str(value or "").strip().upper()
+    if not text:
+        return ""
+    match = re.search(r"\b([A-Z])\b", text)
+    return match.group(1) if match else text[:1]
 
 
 def normalize_object_id(value: Any, source_type: str) -> str:
@@ -173,8 +254,22 @@ class PaperReader:
         self.max_output_tokens = max_output_tokens
 
     def read(
-        self, question: Question, paper: Paper, pdf_path: Path, *, trust_pages: bool = True
+        self,
+        question: Question,
+        paper: Paper,
+        pdf_path: Path,
+        *,
+        trust_pages: bool = True,
+        options: dict[str, str] | None = None,
+        candidates: list[EvidenceCandidate] | None = None,
     ) -> Reading:
+        """One call per (question, paper).
+
+        `options` folds the multiple-choice decision into this call rather than a
+        second one against a text digest. `candidates` (from
+        `littraceqa/pdf/objects.py`) turns locator reporting into a choice from
+        the PDF's own contents instead of free generation.
+        """
         try:
             data = pdf_path.read_bytes()
         except OSError as exc:
@@ -191,9 +286,18 @@ class PaperReader:
             year=paper.year,
             question=question.question,
         )
+        candidates = list(candidates or [])
+        schema = READ_SCHEMA
+        if candidates:
+            prompt += CANDIDATES_BLOCK.format(candidates=format_candidates(candidates))
+            schema = READ_SCHEMA_INDEXED
+        if options:
+            prompt += OPTIONS_BLOCK.format(
+                options="\n".join(f"  {label}. {options[label]}" for label in sorted(options))
+            )
         payload = self.client.generate_json(
             prompt,
-            schema=READ_SCHEMA,
+            schema=schema,
             attachments=[Attachment(data=data, key=paper.paper_id)],
             max_output_tokens=self.max_output_tokens,
             default=None,
@@ -202,6 +306,7 @@ class PaperReader:
             return Reading(paper.paper_id, False, "", "", 0.0, error="unparseable response")
 
         evidence = payload.get("evidence")
+        picks = payload.get("evidence_index")
         reading = Reading(
             paper_id=paper.paper_id,
             found=bool(payload.get("found")),
@@ -209,9 +314,15 @@ class PaperReader:
             quote=str(payload.get("quote") or "").strip(),
             confidence=float(payload.get("confidence") or 0.0),
             evidence=[e for e in (evidence or []) if isinstance(e, dict)],
+            label=_clean_label(payload.get("label")),
+            candidates=candidates,
+            evidence_index=[i for i in (picks or []) if isinstance(i, int)],
         )
-        if not trust_pages:
-            # PDF came from an arXiv fallback; its pagination is not the venue's.
-            for item in reading.evidence:
-                item.pop("page", None)
+        # `trust_pages` is deliberately NOT used to strip pages any more, even on
+        # an arXiv fallback whose pagination is not the venue's. Gold carries a
+        # page on 149/149 validation evidence items, so the evaluator's location
+        # field is never "": dropping the page guarantees a mismatch, while a
+        # possibly-wrong page at least *can* match. Stripping it also deletes
+        # text_span evidence outright, since page is that type's only locator.
+        # Kept on FetchResult for diagnostics.
         return reading

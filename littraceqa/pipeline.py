@@ -17,6 +17,7 @@ from typing import Any
 from .answer.build import build_record
 from .corpus import Paper, PaperPool, Question
 from .pdf.fetch import PDFFetcher
+from .pdf.objects import objects_in_pdf
 from .reason.client import GeminiClient
 from .reason.localize import PaperReader, Reading
 from .reason.solve import AnswerSolver
@@ -41,7 +42,7 @@ class PipelineConfig:
     #: Cross-encoder rerank of the candidate list. MEASURED WIN (exp/08):
     #: paper F1 0.410 -> 0.490, and single-paper 0.692 -> 0.846, which is the
     #: family the test regime resembles. Local and free; ~25s/question on CPU.
-    use_reranker: bool = False
+    use_reranker: bool = True
     #: "question" scores (full question, title+abstract). Do NOT use
     #: "per_mention": measured at 0.396, *below* the 0.410 baseline -- a bare
     #: artefact name gives the cross-encoder too little context.
@@ -60,10 +61,19 @@ class PipelineConfig:
     default_set_size: int = 1
 
     # -- stage D
+    #: Enumerate candidate locators from the PDF and have the reader pick an
+    #: index, instead of generating a page number and object id (pdf/objects.py).
+    #: Gold carries a page on 149/149 validation evidence items and an object id
+    #: on every non-text_span item, so both halves of the key are graded exactly
+    #: and both are transcribable from the PDF.
+    use_pdf_locators: bool = True
     max_papers_to_read: int = 3
     read_confidence_floor: float = 0.35
-    #: Emit evidence only from papers we actually read and believe.
-    evidence_confidence_floor: float = 0.45
+    #: INERT at 0.0, and it should stay that way. See `collect_evidence`: an
+    #: empty evidence list and a wrong one both score F1=0.0 against non-empty
+    #: gold, so filtering can only ever lose points. Kept as a knob so the
+    #: ablation harness can re-measure the claim rather than trust this comment.
+    evidence_confidence_floor: float = 0.0
 
     # -- stage E
     mc_samples: int = 3
@@ -198,6 +208,11 @@ class Pipeline:
     def read_papers(self, question: Question, trace: QuestionTrace) -> list[Reading]:
         if self.reader is None:
             return []
+        options = (
+            question.multiple_choice_options
+            if "multiple_choice" in question.answer_types
+            else None
+        )
         readings: list[Reading] = []
         for paper_id in trace.paper_ids[: self.config.max_papers_to_read]:
             paper: Paper = self.pool[paper_id]
@@ -205,9 +220,17 @@ class Pipeline:
             if not result.ok:
                 trace.fetch_failures.append(paper_id)
                 continue
+            candidates = (
+                objects_in_pdf(result.path, paper_id)
+                if self.config.use_pdf_locators
+                else []
+            )
             readings.append(
                 self.reader.read(
-                    question, paper, result.path, trust_pages=result.pagination_trusted
+                    question, paper, result.path,
+                    trust_pages=result.pagination_trusted,
+                    options=options,
+                    candidates=candidates,
                 )
             )
         return readings
@@ -233,16 +256,20 @@ class Pipeline:
         return parts
 
     def collect_evidence(self, readings: list[Reading]) -> list[dict[str, Any]]:
-        """Evidence from readings we believe.
+        """Evidence from every reading, believed or not.
 
-        Evidence F1 is macro-averaged and gold sets are small (1-4 items), so a
-        speculative extra item costs real precision. Only papers where the model
-        said it found the answer, above the confidence floor, contribute.
+        The precision argument for withholding low-confidence evidence does not
+        survive contact with `evaluate.prf`. Gold evidence is non-empty on all 55
+        validation questions, and for non-empty gold the function returns F1=0.0
+        for an empty prediction *and* F1=0.0 for a wrong one. Abstaining is
+        therefore never better than guessing, and is strictly worse whenever the
+        guess would have been right. The floor was costing us the 29-of-71
+        questions that emitted no evidence at all in `test_v2_rerank.jsonl`.
         """
         floor = self.config.evidence_confidence_floor
         out: list[dict[str, Any]] = []
         for reading in readings:
-            if reading.found and reading.confidence >= floor:
+            if reading.confidence >= floor:
                 out.extend(reading.to_evidence_records())
         return out
 
