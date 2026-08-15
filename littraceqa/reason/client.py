@@ -225,8 +225,17 @@ class GeminiClient:
         model = model or self.model
         path = self._cache_path(prompt, attachments, schema, model)
         if use_cache and path.exists():
-            self.usage.cache_hits += 1
-            return json.loads(path.read_text(encoding="utf-8"))["text"]
+            # Only a hit if the *same* model produced it. The entry is written
+            # under the key of whichever model actually answered, but an older
+            # cache (or a hand-edited one) may disagree; a weak model's answer
+            # must never be served as a strong model's.
+            try:
+                entry = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                entry = None
+            if isinstance(entry, dict) and entry.get("model", model) == model:
+                self.usage.cache_hits += 1
+                return entry["text"]
 
         from google.genai import types
 
@@ -264,7 +273,12 @@ class GeminiClient:
             if text is None:
                 continue
             if use_cache:
-                path.write_text(
+                # Key on the model that ANSWERED, not the one requested. When the
+                # chain falls back (flash-latest exhausted -> flash-lite), writing
+                # to `path` stored the weak answer under the strong model's key,
+                # so tomorrow's run served a flash-lite reading as if it were
+                # flash-latest's and never re-asked.
+                self._cache_path(prompt, attachments, schema, active).write_text(
                     json.dumps({"text": text, "model": active}, ensure_ascii=False),
                     encoding="utf-8",
                 )
