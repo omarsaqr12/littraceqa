@@ -26,10 +26,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..corpus import Paper, PaperPool
-from .dense import DenseRetriever
 from .scope import Scope, scope_indices
+
+if TYPE_CHECKING:  # `predict_set_size` is pure regex -- importing it must not
+    from .dense import DenseRetriever  # drag in numpy/torch via the dense stack.
 
 #: Observed gold-set sizes on validation: 26x1, 1x3, 27x4, 1x9.
 DEFAULT_SINGLE_SIZE = 1
@@ -40,19 +43,52 @@ _NUMBER_WORDS = {
     "six": 6, "seven": 7, "eight": 8, "nine": 9,
 }
 
+#: A word of a noun phrase. Must include hyphens, dashes and slashes: ML papers
+#: are described almost entirely in hyphenated compounds ("alignment-related",
+#: "detection-acceleration/annotation"), and a bare `\w+` splits each of those
+#: into two tokens. That silently blew the intervening-word budget below and made
+#: "the two ICCV 2025 alignment-related adversarial papers" -- an explicit,
+#: confident count -- read as a single-paper question. On the test split the
+#: fix takes explicit-count detections from 10 to 20 of 71.
+_NP_WORD = r"[\w–—/-]+"
+
 #: A count only tells us the gold-set size when it governs a *paper* noun.
 #: "the two prompt compression methods" is about table rows, not papers -- a bare
 #: count-word regex scores 0/3 on validation for exactly this reason.
 _PAPER_NOUNS = r"(?:papers?|works?|studies|publications?|submissions?)"
 _COUNT_BEFORE = re.compile(
     r"\b(" + "|".join(_NUMBER_WORDS) + r"|both)\b"
-    r"(?:\s+\w+){0,4}?\s+" + _PAPER_NOUNS + r"\b",
+    r"(?:\s+" + _NP_WORD + r"){0,6}?\s+" + _PAPER_NOUNS + r"\b",
     re.I,
 )
 
 #: Phrasings that ask for an open-ended set ("which CVPR 2025 papers ...").
+#: **Plural only.** "Across all venues, which VLM-based driving *paper* achieves
+#: the highest driving score" is a single-paper question that the singular-
+#: tolerant `papers?` used to read as an open set, returning 4 papers for a
+#: 1-paper gold set (q_021: F1 1.00 -> 0.40).
+_PLURAL_PAPER_NOUNS = r"(?:papers|works|studies|publications|submissions)"
 _OPEN_SET = re.compile(
-    r"\b(?:which|what|list|identify|all|any)\b(?:\s+\w+){0,6}?\s+" + _PAPER_NOUNS,
+    r"\b(?:which|what|list|identify|all|any)\b(?:\s+" + _NP_WORD + r"){0,6}?\s+"
+    + _PLURAL_PAPER_NOUNS + r"\b",
+    re.I,
+)
+
+#: A plural paper noun under a determiner, with no count attached: "Across these
+#: ICCV 2025 efficiency papers", "Among these motion-focused papers". The
+#: question is explicitly about more than one paper even though it never says
+#: how many.
+_PLURAL_SET = re.compile(
+    r"\b(?:these|those|across|among|between|both)\b(?:\s+" + _NP_WORD + r"){0,6}?\s+"
+    r"(?:papers|works|studies|publications|submissions)\b",
+    re.I,
+)
+
+#: "the encoder-free VLM paper ... and the object-detector event-understanding
+#: paper ...". Each match is one paper referred to by description rather than by
+#: name, so the number of matches is the number of papers.
+_DESCRIBED_PAPER = re.compile(
+    r"\bthe\s+(?:" + _NP_WORD + r"\s+){0,8}?(?:paper|work|study)\b",
     re.I,
 )
 
@@ -108,6 +144,21 @@ def predict_set_size(
     if _OPEN_SET.search(question):
         return SetSizePrediction(multi_default, "open-ended set question", False)
 
+    # Two weaker cues, both of which say "more than one paper" without saying how
+    # many. They are worth acting on because the cost is asymmetric: on a
+    # 2-paper gold set, returning 1 paper caps F1 at 0.67, while returning 2 when
+    # gold is 1 drops it to 0.67 as well -- but the test split is the named-paper
+    # regime (reports/leaderboard_gap.md), where the plural is usually literal.
+    # Both stay `confident=False` so a caller can gate on that.
+    described = len(_DESCRIBED_PAPER.findall(question))
+    if described >= 2:
+        return SetSizePrediction(
+            min(described, multi_default), f"{described} papers referred to by description", False
+        )
+
+    if _PLURAL_SET.search(question):
+        return SetSizePrediction(2, "plural paper noun with no count", False)
+
     return SetSizePrediction(single_default, "default", False)
 
 
@@ -115,7 +166,7 @@ class ClusterExpander:
     def __init__(
         self,
         pool: PaperPool,
-        dense: DenseRetriever,
+        dense: "DenseRetriever",
         *,
         min_similarity: float = 0.72,
         neighbour_pool: int = 60,
