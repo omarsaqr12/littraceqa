@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from dotenv import load_dotenv
 
-from littraceqa.answer.build import validate_records
+from littraceqa.answer.build import deterministic_label, validate_records
 from littraceqa.corpus import DATA_DIR, PaperPool, load_questions, read_jsonl, write_jsonl
 from littraceqa.pdf.fetch import PDFFetcher
 from littraceqa.pipeline import Pipeline, PipelineConfig
@@ -72,10 +72,18 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None, help="Only the first N questions")
     parser.add_argument("--no-read", action="store_true",
                         help="Skip PDF reading and answering; paper selection only")
-    parser.add_argument("--no-expansion", action="store_true")
-    parser.add_argument("--rerank", action="store_true",
-                        help="Cross-encoder rerank of candidates (exp/08: paper "
-                             "F1 0.410 -> 0.490, single-paper 0.692 -> 0.846)")
+    # Opt-in, and measured harmful: cluster expansion scores 0.285 paper F1
+    # against a 0.400 baseline (reports/retrieval_findings.md, exp/06). This was
+    # previously `--no-expansion` with `use_expansion=not args.no_expansion`,
+    # which turned expansion ON by default and contradicted
+    # PipelineConfig.use_expansion=False. Every run.py run so far paid for it.
+    parser.add_argument("--expansion", action="store_true",
+                        help="Cluster-expand the paper set (MEASURED HARMFUL: "
+                             "paper F1 0.285 vs 0.400 baseline; off by default)")
+    parser.add_argument("--no-rerank", action="store_true",
+                        help="Disable cross-encoder reranking of candidates "
+                             "(exp/08: paper F1 0.410 -> 0.490, single-paper "
+                             "0.692 -> 0.846). On by default.")
     parser.add_argument("--selection", default="fused",
                         choices=["fused", "mention_anchored"],
                         help="fused = top-n of the RRF list (best on validation's "
@@ -120,8 +128,8 @@ def main() -> int:
 
     config = PipelineConfig(
         selection=args.selection,
-        use_reranker=args.rerank,
-        use_expansion=not args.no_expansion,
+        use_reranker=not args.no_rerank,
+        use_expansion=args.expansion,
         max_papers_to_read=args.max_papers,
         mc_samples=args.mc_samples,
     )
@@ -194,6 +202,30 @@ def main() -> int:
     if args.trace:
         write_jsonl(traces, Path(args.trace))
         print(f"wrote traces -> {args.trace}")
+
+    # Health check. Both of these are silent failures: a record with no evidence
+    # still validates and still scores, it just scores zero, and a fallback MC
+    # label is indistinguishable from a real one in the output file. Counting
+    # them is the only way a bad run announces itself before the leaderboard does.
+    by_id = {q.query_id: q for q in questions}
+    empty_evidence = [r["query_id"] for r in records if not r.get("evidence")]
+    fallbacks = []
+    for record in records:
+        question = by_id.get(record.get("query_id"))
+        if question is None or "multiple_choice" not in question.answer_types:
+            continue
+        options = sorted(question.multiple_choice_options or {})
+        emitted = str((record.get("answer", {}).get("multiple_choice") or {}).get("gold") or "")
+        if options and emitted == deterministic_label(record["query_id"], options):
+            fallbacks.append(record["query_id"])
+
+    mc_total = sum(1 for q in questions if "multiple_choice" in q.answer_types)
+    print(f"\nempty evidence: {len(empty_evidence)}/{len(records)}")
+    if empty_evidence:
+        print(f"  {', '.join(empty_evidence[:12])}"
+              + (" ..." if len(empty_evidence) > 12 else ""))
+    print(f"suspected MC fallbacks: {len(fallbacks)}/{mc_total} "
+          f"(upper bound -- a real answer can coincide with the seeded guess)")
 
     errors = validate_records(records, questions, {p.paper_id for p in pool.papers})
     if errors:
