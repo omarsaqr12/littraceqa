@@ -1,24 +1,0 @@
-loading pool ...
-building indices ...
-resuming: 0 questions already done in preds/test_v2_rerank.partial.jsonl
-Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights: 100%|██████████| 391/391 [00:00<00:00, 20568.05it/s]
-Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 14412.68it/s]
-  5/71  24.8s/question  calls=9 cache_hits=1 errors=2 by_model={'gemini-flash-lite-latest': 9}
-  10/71  22.5s/question  calls=18 cache_hits=4 errors=2 by_model={'gemini-flash-lite-latest': 18}
-  15/71  28.3s/question  calls=28 cache_hits=6 errors=2 by_model={'gemini-flash-lite-latest': 28}
-  20/71  25.6s/question  calls=33 cache_hits=12 errors=2 by_model={'gemini-flash-lite-latest': 33}
-  25/71  26.1s/question  calls=41 cache_hits=14 errors=2 by_model={'gemini-flash-lite-latest': 41}
-  30/71  24.5s/question  calls=49 cache_hits=17 errors=2 by_model={'gemini-flash-lite-latest': 49}
-  35/71  22.3s/question  calls=57 cache_hits=19 errors=2 by_model={'gemini-flash-lite-latest': 57}
-  40/71  21.0s/question  calls=63 cache_hits=23 errors=2 by_model={'gemini-flash-lite-latest': 63}
-  45/71  20.4s/question  calls=71 cache_hits=25 errors=2 by_model={'gemini-flash-lite-latest': 71}
-  50/71  19.7s/question  calls=78 cache_hits=29 errors=2 by_model={'gemini-flash-lite-latest': 78}
-  55/71  20.0s/question  calls=87 cache_hits=31 errors=2 by_model={'gemini-flash-lite-latest': 87}
-  60/71  19.3s/question  calls=94 cache_hits=35 errors=2 by_model={'gemini-flash-lite-latest': 94}
-  65/71  18.8s/question  calls=101 cache_hits=38 errors=2 by_model={'gemini-flash-lite-latest': 101}
-  70/71  19.2s/question  calls=112 cache_hits=38 errors=2 by_model={'gemini-flash-lite-latest': 112}
-  71/71  19.0s/question  calls=114 cache_hits=38 errors=2 by_model={'gemini-flash-lite-latest': 114}
-
-wrote 71 records -> preds/test_v2_rerank.jsonl
-wrote traces -> preds/test_v2_trace.jsonl
-validation: OK

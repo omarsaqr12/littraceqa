@@ -1,6 +1,0 @@
-Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights: 100%|██████████| 391/391 [00:00<00:00, 10308.65it/s]
-Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 29766.79it/s]
-rerank only              F1=0.490  P=0.614 R=0.459  single=0.846  multi=0.171
-Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 11870.17it/s]
-rerank + LLM selector    F1=0.584  P=0.758 R=0.536  single=0.846  multi=0.348
-usage: calls=55 cache_hits=0 errors=1 by_model={'gemini-flash-lite-latest': 55}
