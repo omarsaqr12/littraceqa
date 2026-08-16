@@ -87,6 +87,13 @@ Nothing here justifies further tuning against validation's cluster regime.
 | `test_v1_mention_anchored.jsonl` | mention-anchored, no rerank | 2.79 (7 questions with none) | 45/71 | A=25 B=9 C=8 D=8 |
 | `test_v2_rerank.jsonl` | fused + cross-encoder rerank | 1.14 | 29/71 | A=16 B=7 C=11 D=16 |
 | `test_v3.jsonl` | fused + rerank, PDF-derived locators | **1.408** | **0/71** | A=15 B=5 C=12 D=18 |
+| `test_v4.jsonl` | v3 + measured evidence-type prior | 1.408 | 0/71 | A=16 B=6 C=11 D=17 |
+
+**v4 is the current-code submission.** It differs from v3 only in the reader
+prompt and is close to indistinguishable from it: the `text_span` share of
+emitted evidence is 55% in both, so the prior did not move the test distribution
+even though it moved validation slightly. Submit either; v4 is the one the
+repository reproduces today.
 
 v3 (16 Aug, 121 calls, all `gemini-flash-lite-latest`) moves every proxy in the
 right direction. The changes behind it are measured in

@@ -111,6 +111,12 @@ paper selection.
   it off produced byte-identical predictions. The flag is fixed because the
   latent bug would bite the moment the seeding changed, not because it cost
   points.
+* **Pinning unambiguous title matches loses points.** q_004's "DynaPipe"
+  matches exactly one of 27,487 titles at score 1.0 and still lost its slot to
+  the reranker. Forcing it to rank 0 costs paper F1 0.490 -> 0.465 overall and
+  0.846 -> 0.808 on the test-like family, because `extract_nicknames` returns
+  every named artefact and most are datasets or baselines, not the subject of
+  the question. Disabled by default in `PipelineConfig`.
 * **Citation numbers are not worth special handling.** They are 5 of the 8
   remaining evidence failures on test-like questions, but **0 of 71 test
   questions mention a numbered reference**.
