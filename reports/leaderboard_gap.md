@@ -1,5 +1,13 @@
 # Where we stand against the leaderboard
 
+> **CORRECTION (16 Aug 2026):** the columns labelled "Table P / Table R / Table F1"
+> throughout this document are actually `table_row_f1_macro`,
+> `table_cell_accuracy_macro`, `table_cell_accuracy_micro`. §3's conclusion that
+> the leaders "under-produce rows" is therefore wrong: their row F1 is 0.5841 and
+> their *cell accuracy* is 0.3254. They place rows better than we do and get the
+> cells wrong -- which is where the remaining headroom on the board is.
+> See `endgame.md §1`.
+
 Leaderboard snapshot (test split, as of 10 Aug 2026):
 
 | Rank | Team | Overall | Paper F1 | Evid. F1 | MC Acc | Table F1 |
@@ -137,3 +145,31 @@ Paper R separately, which resolves this in a single submission:**
 
 Top teams report P=1.000, R=0.982, so the target shape is "return exactly the
 named papers, no padding".
+
+
+## 6. Scored submissions (OdeD)
+
+All three verified against the corrected formula in `endgame.md §1`
+(`(paper_f1 + evidence_f1 + mean(MC, row_f1, cell_acc_macro)) / 3`), which
+reproduces each to six decimals.
+
+| submitted | file | paper P / R / F1 | evid P / R / F1 | MC | row F1 | cell acc | **overall** |
+|---|---|---|---|---|---|---|---|
+| 13 Aug 22:10 | `test_v2_rerank` | .775 / .567 / **.632** | .425 / .329 / **.359** | .680 | .322 | .131 | **0.4563** |
+| 16 Aug 09:44 | `test_v5_local` | .716 / .616 / **.647** | .399 / .305 / **.332** | .720 | .269 | .087 | 0.4462 |
+| 16 Aug (v6) | `test_v6_hosted` | .716 / .616 / **.647** | .444 / .364 / **.389** | .820 | .285 | .095 | **0.4787** |
+
+What the three runs establish, holding one stage at a time:
+
+* **The set-size fix is a real win.** v2 -> v5 changed paper selection only:
+  recall +0.049 for precision -0.059, net paper F1 +0.015. Kept in v6.
+* **The hosted reader beats the local one.** v5 -> v6 changed only the reader,
+  on identical paper selection: evidence F1 +0.056, MC +0.100, row F1 +0.016,
+  cell acc +0.008. Every component improved. This is the clean A/B that
+  `local_reader.md` should have run and did not.
+* **Table is untouched by any of it.** Row F1 has moved .322 -> .269 -> .285 and
+  cell accuracy .131 -> .087 -> .095 while everything else improved. Nothing
+  tried so far addresses it, which is the argument for `endgame.md` C2.
+
+Evidence P > R in all three runs (.444 vs .364 in v6), so we are still emitting
+fewer items than gold on a metric that never rewards abstention.

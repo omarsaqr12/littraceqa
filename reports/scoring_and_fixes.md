@@ -1,5 +1,15 @@
 # What the scoring function actually rewards, and what that changed
 
+> **CORRECTION (16 Aug 2026): §1 of this document is wrong.** The weight vector
+> below was fitted on five leaderboard rows with the table column mislabelled --
+> `table_row_f1 / cell_acc_macro / cell_acc_micro` were read as table P/R/F1. It
+> overshoots every one of our own scored submissions by +0.025 to +0.032.
+> The true formula, verified to six decimals on all three, is
+> `overall = (paper_f1 + evidence_f1 + mean(MC, table_row_f1, table_cell_acc_macro)) / 3`.
+> Table is 2/9 of the score, not 0.177. See `endgame.md §1`.
+> Everything in §2-§6 below (abstention, locator transcribability, the "A"
+> fallback, the set-size regex) was measured directly and still stands.
+
 Measured 15-16 Aug 2026 on the released splits. Everything here is reproducible
 from `data/` plus the commands at the bottom; nothing is quoted from memory.
 
@@ -9,8 +19,14 @@ Fitting the five leaderboard rows in `leaderboard_gap.md` against their four
 component scores recovers the weights to within 0.0008 on every team:
 
 ```
-overall = 0.364*paper_F1 + 0.337*evidence_F1 + 0.177*table_F1 + 0.108*MC_accuracy
+overall = 0.364*paper_F1 + 0.337*evidence_F1 + 0.177*table_F1 + 0.108*MC_accuracy   # SUPERSEDED
 ```
+
+**This is not the scoring function.** Retained only to document how the error was
+made: five rows, four free parameters, and a mislabelled column will fit almost
+anything. The give-away was visible immediately -- it missed our first scored
+submission by +0.0253 -- and should have prompted a refit rather than three more
+configs ranked under it.
 
 | team | reported | reconstructed | error |
 |---|---|---|---|

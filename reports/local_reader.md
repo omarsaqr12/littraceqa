@@ -1,5 +1,22 @@
 # Benchmarking the local reader against the hosted one
 
+> **CORRECTION (16 Aug 2026): the conclusion below did not survive contact with
+> the test set.** Two independent problems:
+>
+> 1. The "weighted score" column uses the superseded weight vector. Under the
+>    real weights the local reader's validation win shrinks from a claimed
+>    +0.0033 to +0.0035 -- still nominally a win, but inside the noise of a
+>    55-question split.
+> 2. **On test it lost outright: 0.4462 against 0.4563 for the hosted reader.**
+>    Evidence F1 fell 0.3587 -> 0.3324 despite emitting 93 items against 52.
+>
+> The methodological error: the local arm was run here, but the hosted arm was
+> quoted from `scoring_and_fixes.md §5` rather than re-run on the same pipeline.
+> Paper F1 matching exactly (0.4901) made that look safe; the reader-stage
+> numbers were not comparable. **Run both arms yourself.** The table regression,
+> which *was* measured on both arms here, replicated on test exactly as predicted
+> (0.528 -> 0.437 on validation; 0.322 -> 0.269 on test).
+
 Measured 16 Aug 2026 on validation (55 questions, official evaluator). Weighted
 score throughout is the fitted leaderboard formula from `scoring_and_fixes.md`:
 `0.364*paper + 0.337*evidence + 0.177*table + 0.108*MC`.
