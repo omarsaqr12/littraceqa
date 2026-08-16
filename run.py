@@ -72,14 +72,16 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None, help="Only the first N questions")
     parser.add_argument("--no-read", action="store_true",
                         help="Skip PDF reading and answering; paper selection only")
-    # Opt-in, and measured harmful: cluster expansion scores 0.285 paper F1
-    # against a 0.400 baseline (reports/retrieval_findings.md, exp/06). This was
-    # previously `--no-expansion` with `use_expansion=not args.no_expansion`,
-    # which turned expansion ON by default and contradicted
-    # PipelineConfig.use_expansion=False. Every run.py run so far paid for it.
+    # Opt-in. This was previously `--no-expansion` with
+    # `use_expansion=not args.no_expansion`, which turned expansion ON by
+    # default against PipelineConfig.use_expansion=False. Measured: the flag was
+    # inert either way, because `select_papers` seeds the list to exactly `size`
+    # members and `ClusterExpander.expand` then returns immediately -- toggling
+    # it produces byte-identical predictions. Fixed because the contradiction
+    # would bite the moment the seeding changed, not because it cost points.
     parser.add_argument("--expansion", action="store_true",
-                        help="Cluster-expand the paper set (MEASURED HARMFUL: "
-                             "paper F1 0.285 vs 0.400 baseline; off by default)")
+                        help="Cluster-expand the paper set (off by default; "
+                             "measured inert under the current seeding)")
     parser.add_argument("--no-rerank", action="store_true",
                         help="Disable cross-encoder reranking of candidates "
                              "(exp/08: paper F1 0.410 -> 0.490, single-paper "
@@ -93,6 +95,14 @@ def main() -> int:
                         help="Model to use; repeat to set the rotation chain. "
                              "Free-tier quota is per model per day, so the "
                              "default chain is what makes a full run possible.")
+    parser.add_argument("--reader", default="gemini", choices=["gemini", "local"],
+                        help="gemini = hosted, quota-bound; local = a GPU model "
+                             "with no quota (littraceqa/reason/local_llm.py)")
+    parser.add_argument("--local-model", default=None,
+                        help="Model id for --reader local")
+    parser.add_argument("--local-samples", type=int, default=1,
+                        help="Self-consistency samples for the local reader; "
+                             "free, unlike the hosted path")
     parser.add_argument("--rpm", type=int, default=8, help="Client-side requests/minute cap")
     parser.add_argument("--max-papers", type=int, default=3,
                         help="PDFs read per question (API budget)")
@@ -117,7 +127,21 @@ def main() -> int:
     pool = PaperPool.load()
 
     client = None
-    if not args.no_read:
+    reader = None
+    if not args.no_read and args.reader == "local":
+        from littraceqa.reason.local_llm import DEFAULT_MODEL, LocalReader
+
+        reader = LocalReader(args.local_model or DEFAULT_MODEL,
+                             samples=args.local_samples)
+        print(f"loading local reader {reader.model_name} ...", flush=True)
+        reader.load()  # eagerly, outside the per-question watchdog
+        # Still build a client when a key exists: the table solver needs one,
+        # and it costs nothing until it is called.
+        client = GeminiClient(model=args.models, rpm=args.rpm,
+                              timeout_seconds=args.timeout)
+        client = client if client.available else None
+
+    if not args.no_read and args.reader == "gemini":
         client = GeminiClient(model=args.models, rpm=args.rpm,
                               timeout_seconds=args.timeout)
         if not client.available:
@@ -134,7 +158,8 @@ def main() -> int:
         mc_samples=args.mc_samples,
     )
     print("building indices ...", flush=True)
-    pipeline = Pipeline(pool, config=config, client=client, fetcher=PDFFetcher())
+    pipeline = Pipeline(pool, config=config, client=client, fetcher=PDFFetcher(),
+                        reader=reader)
 
     out_path = Path(args.out or f"preds/{args.split}.jsonl")
     partial_path = out_path.with_suffix(".partial.jsonl")

@@ -120,6 +120,7 @@ class Pipeline:
         client: GeminiClient | None = None,
         fetcher: PDFFetcher | None = None,
         dense: DenseRetriever | None = None,
+        reader: Any = None,
     ):
         self.pool = pool
         self.config = config or PipelineConfig()
@@ -145,7 +146,14 @@ class Pipeline:
         self.selector = MentionAnchoredSelector(
             pool, self.nicknames, self.acronyms or AcronymIndex(pool), self.bm25, self.dense
         )
-        self.reader = PaperReader(client) if client is not None else None
+        # Any object with PaperReader's `read()` signature: the hosted reader,
+        # or `reason.local_llm.LocalReader` running on the GPU with no quota.
+        self.reader = reader if reader is not None else (
+            PaperReader(client) if client is not None else None
+        )
+        # The solver still needs the hosted client for table synthesis. With a
+        # local reader and no key, table questions fall back to row keys built
+        # from the question and the paper titles.
         self.solver = AnswerSolver(client, mc_samples=self.config.mc_samples) if client else None
 
     # -- stages A-C: paper selection (local, free) -----------------------------
