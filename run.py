@@ -170,7 +170,18 @@ def main() -> int:
             print(f"  [{question.query_id}] FAILED: {exc}", file=sys.stderr)
             from littraceqa.answer.build import build_record
 
-            record = build_record(question, [], [], {})
+            # Never emit an empty paper set just because the reader died. Stages
+            # A-C are local, free and deterministic, so re-running them costs
+            # about a second and recovers the 36.4% of the score that paper F1
+            # carries. Only if retrieval itself is broken do we give up.
+            try:
+                with question_deadline(args.question_timeout, question.query_id):
+                    paper_ids = pipeline.select_papers(question).paper_ids
+            except Exception as retrieval_exc:  # noqa: BLE001
+                print(f"  [{question.query_id}] retrieval also failed: {retrieval_exc}",
+                      file=sys.stderr)
+                paper_ids = []
+            record = build_record(question, paper_ids, [], {})
             trace = None
         records.append(record)
         partial.write(json.dumps(record, ensure_ascii=False) + "\n")

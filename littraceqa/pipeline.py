@@ -92,6 +92,9 @@ class QuestionTrace:
     paper_ids: list[str] = field(default_factory=list)
     readings: list[Reading] = field(default_factory=list)
     fetch_failures: list[str] = field(default_factory=list)
+    #: Non-empty when stage D or E failed but paper selection survived.
+    read_error: str = ""
+    answer_error: str = ""
 
 
 class Pipeline:
@@ -276,13 +279,32 @@ class Pipeline:
     # -- full run --------------------------------------------------------------
 
     def run_question(self, question: Question) -> tuple[dict[str, Any], QuestionTrace]:
+        """Answer one question, degrading stage by stage rather than all at once.
+
+        Stages A-C are local, free and deterministic; stage D spends API quota
+        and is the only part that can fail for reasons outside this process. They
+        used to share one try block in the runner, so a depleted daily quota on
+        question 3 discarded the paper selection for questions 3-71 as well --
+        emitting empty `gold_papers` and scoring zero on the 36.4% of the total
+        that retrieval alone had already earned. Whatever the reader does, the
+        papers we already picked are kept.
+        """
         trace = self.select_papers(question)
-        readings = self.read_papers(question, trace)
+
+        readings: list[Reading] = []
+        try:
+            readings = self.read_papers(question, trace)
+        except Exception as exc:  # noqa: BLE001 -- quota, network, SDK, anything
+            trace.read_error = str(exc)
         trace.readings = readings
+
+        try:
+            answer_parts = self.build_answer(question, trace, readings)
+        except Exception as exc:  # noqa: BLE001
+            trace.answer_error = str(exc)
+            answer_parts = {}
+
         record = build_record(
-            question,
-            trace.paper_ids,
-            self.collect_evidence(readings),
-            self.build_answer(question, trace, readings),
+            question, trace.paper_ids, self.collect_evidence(readings), answer_parts
         )
         return record, trace
