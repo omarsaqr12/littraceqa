@@ -182,6 +182,31 @@ def candidates_from_text(
 
 
 def format_candidates(candidates: list[EvidenceCandidate], limit: int = 220) -> str:
-    """Numbered list for the reader prompt. The index is what the model returns."""
-    lines = [f"{i}. {c.describe()}" for i, c in enumerate(candidates[:limit])]
-    return "\n".join(lines) if lines else "(no locators could be read from this PDF)"
+    """Numbered list for the reader prompt. The index is what the model returns.
+
+    Grouped rather than flat, because a paper has one `text_span` entry per page
+    and only a handful of captioned objects. Listed together, prose entries
+    outnumber the tables and figures several to one and the reader drifts toward
+    them -- we measured 55% of emitted evidence as `text_span` against 16% of
+    gold. Separating them keeps the specific objects visible and marks the prose
+    block as the fallback it is.
+    """
+    if not candidates:
+        return "(no locators could be read from this PDF)"
+
+    shown = candidates[:limit]
+    objects = [(i, c) for i, c in enumerate(shown) if c.source_type != "text_span"]
+    prose = [(i, c) for i, c in enumerate(shown) if c.source_type == "text_span"]
+
+    blocks: list[str] = []
+    if objects:
+        blocks.append(
+            "-- Captioned objects and references (prefer these) --\n"
+            + "\n".join(f"{i}. {c.describe()}" for i, c in objects)
+        )
+    if prose:
+        blocks.append(
+            "-- Running prose, one entry per page (use only if nothing above fits) --\n"
+            + "\n".join(f"{i}. {c.describe()}" for i, c in prose)
+        )
+    return "\n\n".join(blocks)
