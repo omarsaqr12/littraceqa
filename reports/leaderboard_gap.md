@@ -86,6 +86,23 @@ Nothing here justifies further tuning against validation's cluster regime.
 |---|---|---|---|---|
 | `test_v1_mention_anchored.jsonl` | mention-anchored, no rerank | 2.79 (7 questions with none) | 45/71 | A=25 B=9 C=8 D=8 |
 | `test_v2_rerank.jsonl` | fused + cross-encoder rerank | 1.14 | 29/71 | A=16 B=7 C=11 D=16 |
+| `test_v3.jsonl` | fused + rerank, PDF-derived locators | **1.408** | **0/71** | A=15 B=5 C=12 D=18 |
+
+v3 (16 Aug, 121 calls, all `gemini-flash-lite-latest`) moves every proxy in the
+right direction. The changes behind it are measured in
+[scoring_and_fixes.md](scoring_and_fixes.md); the three that matter most:
+
+* **No question abstains any more.** 29 questions previously emitted no evidence
+  and scored a guaranteed zero on 33.7% of the total. Now 0 do.
+* **Locators come from the PDF, not the model.** Page and object id are both
+  graded exactly and both are printed in the paper, so the reader picks an index
+  into a list built by PyMuPDF instead of generating a page number.
+* **Set sizing was broken by a regex that could not match a hyphen**, which read
+  "the two ICCV 2025 alignment-related adversarial papers" as a single-paper
+  question. Papers per question 1.14 -> 1.408.
+
+On the `hidden_source_single_paper` family -- the closest validation analogue to
+the test regime -- the same pipeline scores paper F1 0.846 and evidence F1 0.538.
 
 v2 improves every available proxy. The MC spread is the most telling: `A` is the
 fallback label emitted when the solver fails, so 25 -> 16 means genuinely fewer
