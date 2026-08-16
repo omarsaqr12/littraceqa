@@ -48,6 +48,18 @@ class PipelineConfig:
     #: artefact name gives the cross-encoder too little context.
     rerank_mode: str = "question"
     rerank_prior_weight: float = 0.5
+    #: Put a paper that a mention matches *uniquely* by title n-gram at rank 0,
+    #: after reranking. MEASURED AND DISABLED: paper F1 0.490 -> 0.465 overall,
+    #: and it loses on the test-like family too (0.846 -> 0.808), which is where
+    #: the idea should have paid off. The premise was sound -- q_004's "DynaPipe"
+    #: matches exactly one of 27,487 titles at score 1.0 and still lost its slot
+    #: -- but `extract_nicknames` yields every named artefact in the question,
+    #: and most of them are datasets, baselines or metrics rather than the paper
+    #: being asked about. Pinning "NaturalQ" or "ICAE" evicts the right paper
+    #: more often than pinning "DynaPipe" recovers it. Kept as a flag so the
+    #: claim can be re-measured if mention extraction ever learns which mention
+    #: names the *subject* of the question. See `Pipeline._exact_title_matches`.
+    pin_exact_title_matches: bool = False
     use_dense: bool = True
     use_acronyms: bool = True
     #: Expand the paper set along the embedding graph. MEASURED AND DISABLED:
@@ -92,6 +104,8 @@ class QuestionTrace:
     paper_ids: list[str] = field(default_factory=list)
     readings: list[Reading] = field(default_factory=list)
     fetch_failures: list[str] = field(default_factory=list)
+    #: Papers pinned by an unambiguous title-n-gram match.
+    pinned: list[str] = field(default_factory=list)
     #: Non-empty when stage D or E failed but paper selection survived.
     read_error: str = ""
     answer_error: str = ""
@@ -172,6 +186,21 @@ class Pipeline:
                 )
             ]
 
+        # A mention that matches exactly one title n-gram is the strongest signal
+        # in this system, and it was being outvoted. "How many subfigures are
+        # there in Figure 4 of the DynaPipe paper?" resolves to a single pool
+        # entry at score 1.0 -- "DynaPipe" appears in exactly one of the 27,487
+        # titles -- yet RRF fusion and the cross-encoder together pushed it out
+        # of first place and the question scored paper F1 0.00. The lift applied
+        # to acronym hits above happens *before* reranking, so the reranker
+        # undoes it. Pin these after, where nothing can reorder them.
+        if cfg.pin_exact_title_matches:
+            trace.pinned = self._exact_title_matches(trace.mentions)
+            for paper_id in reversed(trace.pinned):
+                if paper_id in ranked:
+                    ranked.remove(paper_id)
+                ranked.insert(0, paper_id)
+
         trace.candidates = ranked
 
         if cfg.selection == "mention_anchored":
@@ -205,6 +234,21 @@ class Pipeline:
         else:
             trace.paper_ids = seeds
         return trace
+
+    def _exact_title_matches(self, mentions: list[str]) -> list[str]:
+        """Papers a mention pins unambiguously: one title n-gram hit, and only one.
+
+        Deliberately strict. Two papers sharing the n-gram means the mention does
+        not identify either of them, so nothing is pinned and the ranker decides
+        as before.
+        """
+        pinned: list[str] = []
+        for mention in mentions:
+            hits = self.nicknames.lookup(mention, limit=8)
+            title_hits = [p for p, score in hits if score >= NicknameIndex.TITLE_SCORE]
+            if len(title_hits) == 1 and title_hits[0].paper_id not in pinned:
+                pinned.append(title_hits[0].paper_id)
+        return pinned
 
     # -- stage D: read the PDFs ------------------------------------------------
 
