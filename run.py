@@ -100,6 +100,13 @@ def main() -> int:
                              "with no quota (littraceqa/reason/local_llm.py)")
     parser.add_argument("--local-model", default=None,
                         help="Model id for --reader local")
+    parser.add_argument("--local-base-url", default=None,
+                        help="OpenAI-compatible endpoint for --reader local "
+                             "(e.g. http://127.0.0.1:8080 for llama-server). "
+                             "Required to use a GGUF model.")
+    parser.add_argument("--local-ctx", type=int, default=None,
+                        help="Context window of the served model, so the prompt "
+                             "is sized to fit instead of being front-truncated")
     parser.add_argument("--local-samples", type=int, default=1,
                         help="Self-consistency samples for the local reader; "
                              "free, unlike the hosted path")
@@ -132,7 +139,9 @@ def main() -> int:
         from littraceqa.reason.local_llm import DEFAULT_MODEL, LocalReader
 
         reader = LocalReader(args.local_model or DEFAULT_MODEL,
-                             samples=args.local_samples)
+                             samples=args.local_samples,
+                             base_url=args.local_base_url,
+                             context_tokens=args.local_ctx)
         print(f"loading local reader {reader.model_name} ...", flush=True)
         reader.load()  # eagerly, outside the per-question watchdog
         # Still build a client when a key exists: the table solver needs one,

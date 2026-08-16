@@ -107,6 +107,23 @@ letter even if the match is imperfect; there is no credit for abstaining.
 """
 
 
+#: Grammar for the served backend. `evidence_index` is deliberately an array of
+#: integers with no maximum: constraining it to one entry would forbid the
+#: multi-location answers that some questions genuinely need.
+READ_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "found": {"type": "boolean"},
+        "answer": {"type": "string"},
+        "quote": {"type": "string"},
+        "confidence": {"type": "number"},
+        "label": {"type": "string"},
+        "evidence_index": {"type": "array", "items": {"type": "integer"}},
+    },
+    "required": ["found", "answer", "confidence", "evidence_index"],
+}
+
+
 @dataclass(slots=True)
 class _Page:
     number: int
@@ -164,6 +181,9 @@ class LocalReader:
         chars_per_page: int = 3500,
         samples: int = 1,
         temperature: float = 0.7,
+        base_url: str | None = None,
+        context_tokens: int | None = None,
+        timeout: float = 300.0,
     ):
         self.model_name = model_name
         self.device = device
@@ -172,9 +192,22 @@ class LocalReader:
         self.chars_per_page = chars_per_page
         self.samples = samples
         self.temperature = temperature
+        #: OpenAI-compatible endpoint (llama-server, vLLM, ...). When set, the
+        #: model is reached over HTTP and transformers is never imported.
+        #: This is how the 27B GGUF is usable at all: the only HF-format models
+        #: on this box are a 0.5B instruct, a 3B *base* (no chat tuning) and a
+        #: 2B VL, none of which can be trusted to emit schema-shaped JSON.
+        self.base_url = base_url.rstrip("/") if base_url else None
+        #: Prompt budget. llama-server here runs --ctx-size 4096, and the
+        #: defaults above build a ~9k-token prompt, so it must be trimmed or the
+        #: server silently truncates the front -- taking the pages with it.
+        self.context_tokens = context_tokens
+        self.timeout = timeout
         self._model = None
         self._tokenizer = None
+        self._session = None
         self.calls = 0
+        self.truncated = 0
 
     def load(self) -> None:
         """Load weights eagerly. Call before the question loop, never inside it.
@@ -184,6 +217,15 @@ class LocalReader:
         a cold cross-encoder once turned every question into a 420-second
         timeout. Loading up front keeps that out of the timed region.
         """
+        if self.base_url is not None:
+            # Served model: nothing to load locally, but fail loudly here rather
+            # than 71 questions deep if the server is not actually up.
+            import requests
+
+            self._session = requests.Session()
+            response = self._session.get(f"{self.base_url}/v1/models", timeout=15)
+            response.raise_for_status()
+            return
         if self._model is not None:
             return
         import torch
@@ -202,7 +244,45 @@ class LocalReader:
         self.load()
         return self._model
 
+    def _generate_served(self, prompt: str, *, sample: bool) -> str:
+        """One chat completion against an OpenAI-compatible server.
+
+        Output is grammar-constrained to `READ_SCHEMA`. Unconstrained, Qwen3.6
+        narrates its reasoning first ("To determine the number of subfigures, we
+        examine...") and runs out of tokens before emitting any JSON: 2 of the
+        first 3 smoke-test questions returned nothing parseable. Constraining the
+        response makes that failure mode structurally impossible, which matters
+        more here than letting the model think out loud, since the prompt already
+        does the hard part by handing it an enumerated candidate list.
+        """
+        if self._session is None:
+            self.load()
+        payload = {
+            "model": self.model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": self.max_new_tokens,
+            "temperature": self.temperature if sample else 0.0,
+            # Qwen3 thinks by default under --jinja; the reasoning block would
+            # consume max_tokens before any JSON is emitted.
+            "chat_template_kwargs": {"enable_thinking": False},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "reading", "schema": READ_SCHEMA},
+            },
+        }
+        if sample:
+            payload["top_p"] = 0.9
+        response = self._session.post(
+            f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout
+        )
+        response.raise_for_status()
+        self.calls += 1
+        body = response.json()
+        return (body.get("choices") or [{}])[0].get("message", {}).get("content", "") or ""
+
     def _generate(self, prompt: str, *, sample: bool) -> str:
+        if self.base_url is not None:
+            return self._generate_served(prompt, sample=sample)
         import torch
 
         tokenizer = self._tokenizer
@@ -233,6 +313,55 @@ class LocalReader:
         generated = output[0][inputs["input_ids"].shape[1]:]
         return tokenizer.decode(generated, skip_special_tokens=True)
 
+    #: Rough chars-per-token for English prose plus LaTeX-ish noise. Only used to
+    #: size the prompt, so an approximation that errs small is fine.
+    CHARS_PER_TOKEN = 3.6
+
+    def _fit_pages(
+        self,
+        shortlist: list[_Page],
+        candidates: list[EvidenceCandidate],
+        question: Question,
+    ) -> str:
+        """Render page text within the model's context budget.
+
+        Without this the server truncates from the *front*, which silently drops
+        the page text and leaves the model answering from the candidate list
+        alone. Pages are trimmed evenly and the highest-scoring ones kept, since
+        `shortlist_pages` already ordered them by relevance before restoring
+        reading order.
+        """
+        if not shortlist:
+            return "(no text could be extracted)"
+
+        chars_per_page = self.chars_per_page
+        pages = shortlist
+        if self.context_tokens:
+            # Everything that is not page text: prompt scaffolding, the question,
+            # the candidate list, the options block, plus room to generate.
+            overhead = (
+                len(PROMPT) + len(question.question)
+                + sum(len(c.describe()) + 6 for c in candidates)
+                + 600
+            )
+            budget = int(
+                (self.context_tokens - self.max_new_tokens) * self.CHARS_PER_TOKEN
+            ) - overhead
+            if budget < 800:  # pathological; keep one small page rather than none
+                pages, chars_per_page = shortlist[:1], 800
+            else:
+                while len(pages) > 1 and budget // len(pages) < 900:
+                    pages = pages[:-1]
+                chars_per_page = min(self.chars_per_page, max(800, budget // len(pages)))
+                if len(pages) < len(shortlist):
+                    self.truncated += 1
+
+        return "\n\n".join(
+            f"--- page {p.number} ---\n"
+            + re.sub(r"\n{3,}", "\n\n", p.text)[:chars_per_page]
+            for p in pages
+        ) or "(no text could be extracted)"
+
     def read(
         self,
         question: Question,
@@ -250,11 +379,7 @@ class LocalReader:
 
         candidates = list(candidates or [])
         shortlist = shortlist_pages(question.question, text, k=self.pages_per_paper)
-        pages_block = "\n\n".join(
-            f"--- page {p.number} ---\n"
-            + re.sub(r"\n{3,}", "\n\n", p.text)[: self.chars_per_page]
-            for p in shortlist
-        ) or "(no text could be extracted)"
+        pages_block = self._fit_pages(shortlist, candidates, question)
 
         options_block = ""
         if options:
