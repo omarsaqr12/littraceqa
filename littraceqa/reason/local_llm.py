@@ -47,6 +47,19 @@ from .localize import Reading, _clean_label
 #: and follows a JSON schema stated in the prompt. Swap via the constructor.
 DEFAULT_MODEL = "Qwen/Qwen3-8B"
 
+#: Smoke-tested end to end on q_001 with HuggingFaceTB/SmolLM2-1.7B-Instruct,
+#: which was already in the local HF cache. A 1.7B model returned the correct
+#: freeform answer ("14.70") *and* the correct multiple-choice label ("C"); only
+#: the locator was wrong, picking "Figure 2 page 2" where gold is "Table 4 page
+#: 6". So the plumbing works and the answer side is not the hard part -- picking
+#: the right index out of the candidate list is. Expect a competent 8B to do
+#: materially better on that, and check it before trusting the numbers.
+#:
+#: MIND THE CONTEXT WINDOW. Six pages at 3500 chars plus the candidate list ran
+#: to ~8950 tokens on that test, which overflowed SmolLM2's 8192 and produced a
+#: transformers warning. Qwen3-8B has 32k so the defaults are safe there; drop
+#: `pages_per_paper` or `chars_per_page` for any model with a smaller window.
+
 PROMPT = """You are reading one paper from a scientific-literature QA benchmark.
 
 PAPER
