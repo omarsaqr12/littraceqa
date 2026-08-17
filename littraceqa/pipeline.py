@@ -61,6 +61,8 @@ class PipelineConfig:
     #: constraint on paper F1 (86% of what the shortlist permits), so this is
     #: the cheapest remaining accuracy on the heaviest component.
     llm_select_samples: int = 1
+    #: Model for the selector step only. None keeps the client's chain.
+    llm_select_model: str | None = None
     #: Read table CELLS off a rendered page instead of out of the evidence
     #: digest. Row keys stay with the existing logic: exp/14 measured that
     #: letting the image choose rows too moved row F1 0.5280 -> 0.4591 while
@@ -170,7 +172,8 @@ class Pipeline:
         # or `reason.local_llm.LocalReader` running on the GPU with no quota.
         self.llm_selector = LLMPaperSelector(
             pool, client, shortlist=self.config.llm_shortlist,
-            samples=self.config.llm_select_samples
+            samples=self.config.llm_select_samples,
+            model=self.config.llm_select_model
         ) if (self.config.use_llm_selector and client is not None) else None
         self.visual_table = VisualTableSolver(
             client, self.fetcher

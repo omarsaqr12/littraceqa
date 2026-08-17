@@ -90,6 +90,8 @@ def main() -> int:
                         help="Candidates shown to the LLM selector. Gold coverage "
                              "saturates at top-30 (0.686 -> 0.703); beyond that the "
                              "limit is candidate generation, not selection.")
+    parser.add_argument("--llm-select-model", default=None,
+                        help="Model for the selector step only (~71 calls/run).")
     parser.add_argument("--llm-select-samples", type=int, default=1,
                         help="Independent selector passes, majority-voted.")
     parser.add_argument("--llm-select", action="store_true",
@@ -179,6 +181,7 @@ def main() -> int:
         use_llm_selector=args.llm_select,
         llm_shortlist=args.llm_shortlist,
         llm_select_samples=args.llm_select_samples,
+        llm_select_model=args.llm_select_model,
         visual_table_cells=args.visual_table,
         use_expansion=args.expansion,
         max_papers_to_read=args.max_papers,

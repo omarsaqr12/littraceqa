@@ -92,6 +92,8 @@ class LLMPaperSelector:
         abstract_chars: int = 420,
         max_selected: int = 8,
         samples: int = 1,
+        model: str | None = None,
+        thinking_budget: int | None = -1,
     ):
         self.pool = pool
         self.client = client
@@ -99,6 +101,17 @@ class LLMPaperSelector:
         self.abstract_chars = abstract_chars
         self.max_selected = max_selected
         self.samples = samples
+        #: Selection is ~71 calls for a whole test run, so it can afford the best
+        #: model available while the reader (3x that) stays on flash-lite. The
+        #: four teams at paper precision exactly 1.0000 are not doing anything
+        #: cheap here.
+        self.model = model
+        #: -1 leaves the model's own default alone. The client disables thinking
+        #: globally, which is right for the reader (small schema-bound answers)
+        #: and wrong here: gemini-3.7-flash with thinking off returned exactly
+        #: one paper on all 55 validation questions, against 1.31 for flash-lite
+        #: and 2.65 in gold. Selection is a reasoning task over 30 candidates.
+        self.thinking_budget = thinking_budget
 
     def _render(self, papers: list[Paper]) -> str:
         lines = []
@@ -139,7 +152,9 @@ class LLMPaperSelector:
             payload = self.client.generate_json(
                 prompt if attempt == 0 else f"{prompt}\n\n(independent attempt {attempt + 1})",
                 schema=SELECT_SCHEMA,
-                max_output_tokens=2048,
+                model=self.model,
+                thinking_budget=self.thinking_budget,
+                max_output_tokens=4096,
                 default=None,
             )
             if not isinstance(payload, dict):

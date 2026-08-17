@@ -223,6 +223,7 @@ class GeminiClient:
         max_output_tokens: int = 2048,
         use_cache: bool = True,
         extra_config: dict[str, Any] | None = None,
+        thinking_budget: int | None = None,
     ) -> str:
         """Return raw model text. `schema` requests structured JSON output.
 
@@ -261,11 +262,10 @@ class GeminiClient:
             config["response_schema"] = schema
         if extra_config:
             config.update(extra_config)
-        if self.thinking_budget is not None:
+        budget = self.thinking_budget if thinking_budget is None else thinking_budget
+        if budget is not None and budget >= 0:
             try:
-                config["thinking_config"] = types.ThinkingConfig(
-                    thinking_budget=self.thinking_budget
-                )
+                config["thinking_config"] = types.ThinkingConfig(thinking_budget=budget)
             except Exception:
                 pass  # older SDK -- `_try_model` also strips it per model
 
