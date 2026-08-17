@@ -65,10 +65,29 @@ different parses of the same one.
 The scoring change is kept — it is more correct in principle and costs nothing — but it
 is **not** an improvement and must not be counted as one.
 
-Open question this leaves: which edition the annotators used. `fetch_status.json`
-records only "cached" for already-downloaded papers, so the audit could not split
-deltas by original fetch source. Resolving that needs the source recorded per paper at
-download time. Filed as H3.
+### H3 follow-up: the source *is* recorded, `fetch()` was hiding it
+
+`fetch()` returned `"cached"` for any paper already on disk, discarding the
+`source` that `fetch_status.json` had stored at download time. That is why every
+row of the by-source table read "cached" — the audit could not split deltas by
+the one variable it existed to test. Fixed: a cache hit now reports the original
+source.
+
+It does not settle H3 yet. Only 20 of the 67 papers carrying gold evidence were
+fetched after source tracking was added:
+
+| recorded source | papers |
+|---|---|
+| direct | 10 |
+| openreview | 6 |
+| mirror | 4 |
+| *no record* | 47 |
+
+All 20 recorded are `pagination_trusted=True`, so none of the observed deltas
+come from an arXiv fallback — which was the leading hypothesis for the −14 and
+−9 outliers and is now ruled out for those 20. Backfilling the other 47 means
+re-downloading ~100 PDFs; deferred, because it cannot change today's conclusion
+that no per-venue offset exists.
 
 ## E6 — gold table cells are never null
 

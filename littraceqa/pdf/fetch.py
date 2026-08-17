@@ -167,8 +167,13 @@ class PDFFetcher:
         dest = self.cache_dir / f"{paper.paper_id}.pdf"
         if dest.exists() and dest.stat().st_size > 1024 and not force:
             prior = self.status.get(paper.paper_id, {})
+            # Report where the file originally came from, not the fact that it is
+            # cached. "cached" told a page-alignment audit nothing: every paper
+            # reported it, so deltas could not be split by source and the one
+            # question the audit existed to answer -- which edition we fetched --
+            # stayed open. Falls back to "cached" only when nothing was recorded.
             return FetchResult(
-                paper.paper_id, dest, "cached",
+                paper.paper_id, dest, prior.get("source") or "cached",
                 pagination_trusted=prior.get("pagination_trusted", True),
             )
 
