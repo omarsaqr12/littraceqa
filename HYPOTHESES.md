@@ -9,7 +9,12 @@ Component weights: paper 1/3, evidence 1/3, MC 1/9, table row F1 1/9, table cell
 
 ---
 
-## H1 · Identify-then-match paper selection *(in progress — E1)*
+## ~~H1 · Identify-then-match~~ — KILLED, successor shipped (+0.0542 overall)
+Asking for a title is a recall task the model cannot do: 0 of 29 unmatched titles were
+within 80% of gold, median similarity 56. Recognition over retrieved candidates works
+and is shipped (`--llm-select`). See `reports/paper_selection.md`. Original entry:
+
+## H1 · Identify-then-match paper selection *(killed)*
 **Component:** paper F1 (1/3) · **Expected:** +0.08 to +0.11 · **Cost:** 3h
 
 Four teams report paper precision *exactly* 1.0000 on a 27,487-paper pool. Our oracle
@@ -22,7 +27,12 @@ answers from parametric knowledge on questions where we hand it the wrong paper.
 **Successor:** same model as a reranker over the existing top-40 titles, which tests the
 knowledge hypothesis without requiring exact title reproduction.
 
-## H2 · Rebuild the table data path *(queued — E7)*
+## H2 · Rebuild the table data path *(partially measured — E7)*
+Visual read nearly doubles cell accuracy (0.0682 → 0.1591) but must not choose rows
+(row F1 0.5280 → 0.4591). Split into `fill_cells`; awaiting a full 11-question run
+when quota resets. Original entry:
+
+## H2 · Rebuild the table data path
 **Component:** table row F1 + cell acc (2/9) · **Expected:** +0.05 to +0.09 · **Cost:** 6h
 
 `solve_table()` reconstructs a table from `format_evidence()`, a one-line-per-paper
@@ -105,3 +115,37 @@ confident in is worth emitting. We currently emit 56 rows across 21 test table q
 
 **Dies if:** row F1 falls on validation when row count is raised — meaning the extra
 rows are worse than random, not merely uncertain.
+
+
+## H9 · Second reader pass on the paper the selector chose
+**Component:** evidence F1 (1/3) · **Expected:** +0.02 to +0.05 · **Cost:** 2h
+
+`--llm-select` changes which papers we read, but the reader still runs once per paper
+with a single shot at the locator. Evidence P (0.364) is now *below* R (0.295) reversed
+from earlier runs — worth re-deriving the marginal threshold from the post-selection
+numbers rather than the pre-selection ones, then emitting to it.
+
+**Dies if:** a second pass agrees with the first on >90% of locators — then it is
+sampling noise, not a second opinion.
+
+## H10 · Row keys from the question via a dedicated extraction call
+**Component:** table row F1 (1/9) · **Expected:** +0.03 to +0.06 · **Cost:** 2h
+
+Row F1 is 0.5280 and the failures are questions where rows come from the *retrieved set*
+(one row per method, one method per paper) rather than from an enumeration in the
+question. q_030 scores 1.00 with zero readings because its rows are named in the
+question; q_025 scores 0.00 because its four rows are four papers we did not all find.
+A dedicated call that names the row keys before any reading happens separates the two.
+
+**Dies if:** extracted row keys match gold no better than the current implicit path on
+the 11 validation table questions.
+
+## H11 · Backfill fetch sources and re-run the page audit
+**Component:** evidence F1 (1/3) · **Expected:** +0.00 to +0.03 · **Cost:** 2h
+
+47 of 67 gold-evidence papers predate source tracking. Re-fetch with `force=True` to
+record the source, then split the 27% page disagreements by it. If one source is
+systematically wrong for a venue, switch that venue's routing.
+
+**Dies if:** deltas remain uncorrelated with source — the annotators used an edition we
+cannot obtain and 73% is the ceiling on anchored pages.
