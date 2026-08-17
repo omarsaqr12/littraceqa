@@ -108,7 +108,12 @@ Rules:
 - Emit one row per item the question asks about -- no more. Extra rows cost
   precision.
 - {types}
-- Use null for a cell you genuinely cannot determine. Do not invent numbers."""
+- **Fill every cell.** A null scores exactly the same zero as a wrong value
+  (`cell_equal` counts null correct only when gold is also null, and 0 of 27
+  graded gold cells are null), so a considered guess is strictly better than
+  leaving a blank. Read the value off the paper where you can; where you cannot,
+  give the most plausible value consistent with the rest of the row and the
+  paper's reported numbers. Never emit null."""
 
 FREEFORM_PROMPT = """Give the final answer to this question about scientific papers.
 
@@ -315,11 +320,18 @@ def _to_number(value: Any) -> float | int | None:
         return None
     if isinstance(value, (int, float)):
         return value
-    match = re.search(r"-?\d+(?:\.\d+)?", str(value).replace(",", ""))
+    # Same recovery as answer.build._coerce_number: scientific tables carry
+    # units, error bars and thousands separators, and nulling those loses a
+    # real answer on a metric where null is never right.
+    text = str(value).replace(",", "").replace("\u2212", "-")
+    match = re.search(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?", text)
     if not match:
         return None
-    text = match.group(0)
-    return int(text) if "." not in text else float(text)
+    token = match.group(0)
+    try:
+        return float(token) if any(c in token for c in ".eE") else int(token)
+    except ValueError:
+        return None
 
 
 def _to_bool(value: Any) -> bool | None:

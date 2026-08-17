@@ -26,7 +26,7 @@ import pymupdf
 
 #: "Table 4:", "Figure 2.", "Fig. 3", "Algorithm 1", "Equation (6)".
 CAPTION = re.compile(
-    r"^\s*(Table|Figure|Fig|Algorithm|Alg|Equation|Eq)\.?\s*([0-9]+[a-z]?)\s*[:.\)]?\s",
+    r"^\s*(Table|Figure|Fig|Algorithm|Alg|Equation|Eq)\.?\s*([0-9]+[a-z]?)\s*([:.\)]?)\s",
     re.I | re.M,
 )
 _CANONICAL = {
@@ -45,9 +45,41 @@ class Caption:
     number: str
     page: int
     object_id: str = ""
+    #: How caption-like this occurrence is; see `_caption_strength`.
+    strength: int = 0
 
     def __post_init__(self) -> None:
         self.object_id = f"{self.kind} {self.number}"
+
+
+def _caption_strength(delimiter: str, following: str) -> int:
+    """Distinguish a real caption from a cross-reference to one.
+
+    `CAPTION`'s delimiter is optional, so an extracted line beginning "Table 3
+    shows that ..." scores as a caption for Table 3. PDF text extraction breaks
+    lines constantly, so these are common, and taking the first match made 27%
+    of anchored gold locators resolve to the wrong page (exp/10).
+
+    A real caption is "Table 4: Cross-domain QA evaluation ..." -- a delimiter
+    and then a descriptive clause. A cross-reference has neither.
+    """
+    score = 0
+    if delimiter == ":":
+        score += 3          # near-conclusive
+    elif delimiter in ".)":
+        score += 1
+    words = following.split()
+    if len(words) >= 5:
+        score += 1          # captions describe; references just point
+    if words and words[0][:1].isupper():
+        score += 1
+    # "in Table 3 we show" -- a verb right after the number means a reference.
+    if words and words[0].lower() in {
+        "shows", "show", "presents", "present", "reports", "lists", "we", "it", "which",
+        "summarises", "summarizes", "compares", "gives", "illustrates", "and", "the",
+    }:
+        score -= 3
+    return score
 
 
 @dataclass
@@ -69,20 +101,26 @@ class PaperText:
         for index, text in enumerate(self.pages, start=1):
             for match in CAPTION.finditer(text):
                 kind = _CANONICAL[match.group(1).lower()]
-                found.append(Caption(kind, match.group(2), index))
+                following = text[match.end(): match.end() + 90]
+                found.append(Caption(
+                    kind, match.group(2), index,
+                    strength=_caption_strength(match.group(3), following),
+                ))
         return found
 
     def page_of(self, object_id: str) -> int | None:
-        """First page carrying a caption for e.g. "Table 4". None if absent.
+        """Page carrying the real caption for e.g. "Table 4". None if absent.
 
-        Used to cross-check a model-reported page; a mismatch means one of the
-        two is wrong and the evidence item deserves a lower confidence.
+        Picks the most caption-like occurrence rather than the first, because
+        cross-references ("Table 3 shows ...") also start extracted lines.
         """
         want = re.sub(r"\s+", " ", str(object_id or "")).strip().lower()
-        for caption in self.captions:
-            if caption.object_id.lower() == want:
-                return caption.page
-        return None
+        matches = [c for c in self.captions if c.object_id.lower() == want]
+        if not matches:
+            return None
+        # Strongest caption wins; earliest page breaks ties. Taking the first
+        # occurrence instead resolved 27% of gold locators to a cross-reference.
+        return min(matches, key=lambda c: (-c.strength, c.page)).page
 
     def caption_text(self, object_id: str, chars: int = 400) -> str:
         page = self.page_of(object_id)

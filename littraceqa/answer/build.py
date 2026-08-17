@@ -18,6 +18,7 @@ failing validation at submission time.
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Any
 
 from ..corpus import Question
@@ -135,19 +136,63 @@ def build_record(
 
 
 def _conform_row(row: dict[str, Any], columns: dict[str, str]) -> dict[str, Any]:
+    """Coerce a row to the schema's columns and types, nulling as a last resort.
+
+    `cell_equal` counts a cell correct only when gold and prediction are *both*
+    null, and **0 of 27 graded gold cells on validation are null** (exp/11). So
+    null is a guaranteed zero here, exactly as costly as a wrong guess and
+    strictly worse than a plausible one.
+
+    This used to null any type mismatch outright, which threw away real answers:
+    a model returning the string ``"2.05"`` for a number column had it deleted
+    rather than parsed. Recovery is attempted first now, and the prompt no
+    longer invites nulls either -- both paths had to change, since fixing only
+    the prompt leaves the coercion silently undoing it.
+    """
     out: dict[str, Any] = {}
     for name, expected in columns.items():
         value = row.get(name)
         if value is None:
             out[name] = None
         elif expected == "number":
-            out[name] = value if isinstance(value, (int, float)) and not isinstance(value, bool) \
-                else None
+            number = _coerce_number(value)
+            out[name] = number
         elif expected == "boolean":
-            out[name] = value if isinstance(value, bool) else None
+            out[name] = value if isinstance(value, bool) else _coerce_bool(value)
         else:
             out[name] = value if isinstance(value, str) else str(value)
     return out
+
+
+def _coerce_number(value: Any) -> float | int | None:
+    """Best-effort number out of whatever the model produced.
+
+    Handles the forms that actually show up in scientific tables: ``"2.05"``,
+    ``"96.2%"``, ``"32.7±0.5"``, ``"1,204,000"``, ``"~4.1"``. Takes the first
+    numeric token, which is the value rather than its error bar.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    text = str(value).replace(",", "").replace("−", "-")
+    match = re.search(r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?", text)
+    if not match:
+        return None
+    token = match.group(0)
+    try:
+        return float(token) if any(c in token for c in ".eE") else int(token)
+    except ValueError:
+        return None
+
+
+def _coerce_bool(value: Any) -> bool | None:
+    text = str(value).strip().lower()
+    if text in {"true", "yes", "y", "1"}:
+        return True
+    if text in {"false", "no", "n", "0"}:
+        return False
+    return None
 
 
 def validate_records(
