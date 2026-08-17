@@ -9,143 +9,86 @@ Component weights: paper 1/3, evidence 1/3, MC 1/9, table row F1 1/9, table cell
 
 ---
 
-## ~~H1 · Identify-then-match~~ — KILLED, successor shipped (+0.0542 overall)
-Asking for a title is a recall task the model cannot do: 0 of 29 unmatched titles were
-within 80% of gold, median similarity 56. Recognition over retrieved candidates works
-and is shipped (`--llm-select`). See `reports/paper_selection.md`. Original entry:
+## Closed this session
 
-## H1 · Identify-then-match paper selection *(killed)*
-**Component:** paper F1 (1/3) · **Expected:** +0.08 to +0.11 · **Cost:** 3h
+| id | hypothesis | outcome |
+|---|---|---|
+| H1 | identify-then-match by generated title | **killed** — 0/29 titles within 80% of gold, median 56 |
+| H1b | LLM recognition over candidates | **SHIPPED, +0.0542 val / +0.0732 test** |
+| H2 | rebuild the table data path | partial — cell acc +0.0455 val, **0.000 test** |
+| H3 | record fetch source, re-audit pages | fixed the reporting bug; 47/67 papers predate tracking |
+| H4 | emit evidence to the marginal threshold | **killed** — recall +0.032, precision −0.028 |
+| H7 | full-text mention verification | **killed** — 1 paper dropped in 55, +0.003 |
+| H8 | over-generate table rows | folded into H2; row keys are not the constraint |
+| — | deeper LLM shortlist (20→30) | +0.0109 val, **−0.0026 test** |
+| — | selector self-consistency (3 votes) | +0.0085, CI [−0.023, +0.052] — not shippable |
+| — | free selectors (gpt-oss-120b, glm-4.7, qwen) | all **below** flash-lite |
 
-Four teams report paper precision *exactly* 1.0000 on a 27,487-paper pool. Our oracle
-over top-40 caps at 0.756, so ranking title+abstract cannot get there. They are asking a
-model that knows the 2025 literature which paper the question means, then matching the
-returned title into the pool. Our own MC is 0.82 at paper F1 0.647 — the reader already
-answers from parametric knowledge on questions where we hand it the wrong paper.
-
-**Dies if:** `hidden_source_single_paper` family F1 < 0.87 (currently 0.846).
-**Successor:** same model as a reranker over the existing top-40 titles, which tests the
-knowledge hypothesis without requiring exact title reproduction.
-
-## H2 · Rebuild the table data path *(partially measured — E7)*
-Visual read nearly doubles cell accuracy (0.0682 → 0.1591) but must not choose rows
-(row F1 0.5280 → 0.4591). Split into `fill_cells`; awaiting a full 11-question run
-when quota resets. Original entry:
-
-## H2 · Rebuild the table data path
-**Component:** table row F1 + cell acc (2/9) · **Expected:** +0.05 to +0.09 · **Cost:** 6h
-
-`solve_table()` reconstructs a table from `format_evidence()`, a one-line-per-paper
-digest of a single answer string. Cell accuracy 0.0952 is what that produces. Rewriting
-`TABLE_PROMPT` gave byte-identical output, which confirms the prompt was never the
-constraint — the data path is. Replace with: row keys from the question, locate the
-source table via the caption index, render that page at 2x, ask for all rows and columns
-in one call against the schema.
-
-**Dies if:** cell acc < 0.20 on the 11 validation table questions.
-**Successor:** dedicated PDF table parser (MinerU / Marker 2) feeding the schema
-directly, rather than a VLM read.
-
-## H3 · Record fetch source per paper, then re-audit page deltas
-**Component:** evidence F1 (1/3) · **Expected:** +0.00 to +0.04 · **Cost:** 1h
-
-E4 found 27% of anchored gold locators land on a different page than ours, with no
-per-venue constant — so some papers are a different *edition* (arXiv vs camera-ready vs
-proceedings). `fetch_status.json` records "cached" for anything already downloaded, so
-the audit could not split deltas by source. Record the true source at download time,
-re-run exp/10 split by it, and if one source is systematically wrong for a venue, switch
-that venue's routing.
-
-**Dies if:** deltas are uncorrelated with fetch source — then the annotators used
-something we cannot obtain and 73% is the ceiling on anchored pages.
-
-## H4 · Emit evidence up to the marginal-add threshold
-**Component:** evidence F1 (1/3) · **Expected:** +0.03 to +0.06 · **Cost:** 2h
-
-Evidence P (0.444) > R (0.364) in all three scored runs, so gold sets are ~22% larger
-than ours. On a set-F1 metric, adding a candidate with hit probability `p` raises
-expected F1 iff `p > F1/2` = **0.19** at our 0.389. We are abstaining well above that
-threshold while the reader prompt still says "Do not pad the list". Validation gold
-averages 2.7 evidence items per question; we emit ~1.4.
-
-**Dies if:** a sweep over {+1 same-page text_span, top-3, top-4} lowers F1 on validation
-with bootstrap CIs excluding zero.
+## Still open
 
 ## H5 · `test-extra` as the statistical dev set
-**Component:** all · **Expected:** indirect, unlocks everything else · **Cost:** 2h
+**Component:** all · **Expected:** indirect · **Cost:** 2h
 
-4,901 questions with a separate 5/day submission budget on `littraceqa-test-extra`.
-Retrieval is local and free, so a paper-only file over all 4,901 costs compute and
-returns paper P/R/F1 at n≈4,901 instead of 55. Every retrieval decision currently argued
-from 55 examples with 2-point noise bands can be settled properly.
+4,901 questions with a separate 5/day budget on `littraceqa-test-extra`. The
+single most under-used resource: every decision this session was argued from 55
+questions with 2-point noise bands, and three of them were wrong. Retrieval is
+local and free, so a paper-only file over all 4,901 costs compute only — but
+`--llm-select` needs API calls, so a full-pipeline run over 4,901 is not free.
+Sample 500 for a ±0.03 band at ~500 selector calls.
 
-**Dies if:** the split's paper F1 ranks configs differently from `test` on two
-consecutive comparisons — then it is a different distribution and only useful for
-absolute coverage checks.
+**Dies if:** it ranks configs differently from `test` twice running.
 
-## H6 · Ask the reader for the answer *and* the option letter in one call
-**Component:** MC (1/9) · **Expected:** +0.01 to +0.02 · **Cost:** 1h
+## H9 · Re-test `gemini-3.7-flash` as selector with thinking genuinely on
+**Component:** paper F1 (1/3) · **Expected:** unknown · **Cost:** 1h + quota
 
-Already partly done — `localize.OPTIONS_BLOCK` shows the reader the options and
-`solve_multiple_choice` votes on `Reading.label` before falling back to a prompt over
-the text digest. But the digest path still runs when no reading carried a label, and it
-re-decides from a summary that has thrown the PDF away. MC is 0.82 against the leaders'
-1.000, and the residual is mostly gated by paper selection (0.600 with a correct paper,
-0.062 without), so this only pays after H1.
+Still **untested**, not disproven. Its one measurement (0.4982, returning exactly
+one paper on all 55 questions) was taken with thinking disabled by the client's
+global setting, and the retest died after one call on a per-day 429. The
+cache-key bug that would have silently invalidated the retest is fixed.
 
-**Dies if:** MC given a correct paper does not move above 0.85 on validation.
+**Dies if:** with thinking on it still returns a near-constant number of papers —
+that would mean the uniformity is the model, not the configuration.
 
-## H7 · Verify paper choice by full-text mention counting
-**Component:** paper F1 (1/3) · **Expected:** +0.03 to +0.06 · **Cost:** 4h
+## H10 · Row keys from a dedicated extraction call
+**Component:** table row F1 (1/9) · **Expected:** +0.02 to +0.05 · **Cost:** 2h
 
-Paper precision is 0.716, so ~28% of returned papers are wrong. A named artefact
-appearing three or more times in one candidate and zero times in the alternatives
-resolves the choice outright, and it is nearly false-positive-free. The PDFs are the
-same ones stage D needs, so the download is not wasted.
+Row F1 is 0.2738 on test and has not moved across four submissions and three code
+paths. Rows come either from the question's enumeration or from the retrieved set;
+q_030 scores 1.00 with zero readings, q_025 scores 0.00 because its four rows are
+four papers. A call that names the row keys before any reading separates them.
 
-**Dies if:** precision gain < 0.05, or recall drops more than 0.02 because mentions are
-absent from papers that are nonetheless gold.
-
-## H8 · Over-generate table rows while row F1 is low
-**Component:** table row F1 (1/9) · **Expected:** +0.02 to +0.04 · **Cost:** 1h
-
-Marginal-add threshold for rows is `F1/2` = **0.14** at our 0.285. Any row we are 15%
-confident in is worth emitting. We currently emit 56 rows across 21 test table questions
-(2.7/question) and several questions collapse to a single row.
-
-**Dies if:** row F1 falls on validation when row count is raised — meaning the extra
-rows are worse than random, not merely uncertain.
-
-
-## H9 · Second reader pass on the paper the selector chose
-**Component:** evidence F1 (1/3) · **Expected:** +0.02 to +0.05 · **Cost:** 2h
-
-`--llm-select` changes which papers we read, but the reader still runs once per paper
-with a single shot at the locator. Evidence P (0.364) is now *below* R (0.295) reversed
-from earlier runs — worth re-deriving the marginal threshold from the post-selection
-numbers rather than the pre-selection ones, then emitting to it.
-
-**Dies if:** a second pass agrees with the first on >90% of locators — then it is
-sampling noise, not a second opinion.
-
-## H10 · Row keys from the question via a dedicated extraction call
-**Component:** table row F1 (1/9) · **Expected:** +0.03 to +0.06 · **Cost:** 2h
-
-Row F1 is 0.5280 and the failures are questions where rows come from the *retrieved set*
-(one row per method, one method per paper) rather than from an enumeration in the
-question. q_030 scores 1.00 with zero readings because its rows are named in the
-question; q_025 scores 0.00 because its four rows are four papers we did not all find.
-A dedicated call that names the row keys before any reading happens separates the two.
-
-**Dies if:** extracted row keys match gold no better than the current implicit path on
-the 11 validation table questions.
+**Dies if:** extracted row keys match gold no better than the current implicit path.
 
 ## H11 · Backfill fetch sources and re-run the page audit
 **Component:** evidence F1 (1/3) · **Expected:** +0.00 to +0.03 · **Cost:** 2h
 
-47 of 67 gold-evidence papers predate source tracking. Re-fetch with `force=True` to
-record the source, then split the 27% page disagreements by it. If one source is
-systematically wrong for a venue, switch that venue's routing.
+47 of 67 gold-evidence papers predate source tracking. Re-fetch with `force=True`,
+then split the 27% page disagreements by source. E4 found no per-venue offset, but
+never got to test per-*source*.
 
-**Dies if:** deltas remain uncorrelated with source — the annotators used an edition we
-cannot obtain and 73% is the ceiling on anchored pages.
+**Dies if:** deltas stay uncorrelated with source — the annotators used an edition
+we cannot obtain and 73% is the ceiling on anchored pages.
+
+## H12 · Emit a second locator only on high-agreement papers
+**Component:** evidence F1 (1/3) · **Expected:** +0.01 to +0.03 · **Cost:** 2h
+
+Blanket padding failed (H4) because the reader's second locator is drawn from the
+same distribution as its first, and the first is right ~50% of the time even on a
+correctly selected paper. But the decomposition shows 18 of 25 addressable errors
+are *wrong page, right paper and type* — so a second locator restricted to the
+same paper and a different page targets a specific failure rather than padding
+blindly.
+
+**Dies if:** precision falls faster than recall rises, as in H4.
+
+## H13 · Cross-check the reader's page against the caption index
+**Component:** evidence F1 (1/3) · **Expected:** +0.01 to +0.03 · **Cost:** 1h
+
+`use_pdf_locators` already has the reader pick an index into a mechanically-built
+candidate list, so pages should be exact by construction — yet 18 of 25 locator
+errors are page errors. Either the reader picks the wrong candidate, or the
+candidate list itself carries the wrong page. Instrumenting which would say
+whether this is a reader problem or a `pdf/objects.py` problem.
+
+**Dies if:** the reader's picks already agree with the caption index — then the
+errors are edition differences and E4's 73% ceiling binds.
