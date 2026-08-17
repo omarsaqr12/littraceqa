@@ -69,3 +69,50 @@ already are. Paper F1 is 0.5837 against the leaders' 0.99, and until that closes
 multi-paper table questions cannot be filled from pages we never fetched.
 
 That reframes the remaining table headroom: it is not mostly a table problem.
+
+---
+
+# E5 — the marginal-add rule does not hold for evidence
+
+Validation, same pipeline, one change at a time.
+
+| config | evidence F1 | MC | cell acc | ev/question | overall |
+|---|---|---|---|---|---|
+| 2 papers | 0.3127 | 0.5854 | 0.2384 | 1.16 | 0.4497 |
+| 3 papers + padding prompt | 0.3084 | 0.5366 | 0.2838 | 1.45 | 0.4478 |
+| **3 papers, prompt reverted** | **0.3197** | 0.5854 | 0.2611 | 1.25 | **0.4545** |
+
+Isolated: **`--max-papers 3` is worth +0.0048; the padding prompt is worth −0.0066.**
+
+## The negative result
+
+We emit 64 evidence items against gold's 130 — 49%, a deficit of 66 across 55
+questions. Evidence F1 is 0.3127, so the marginal-add rule says any location with
+better than a `F1/2 = 0.156` chance of being gold raises expected F1. The reader
+prompt was telling it the opposite ("Usually exactly one. Do not pad the list"),
+so asking for 2-3 locations looked like free upside.
+
+It is not. Padding moved recall +0.032 and precision −0.028, netting **−0.0043**
+on evidence F1. The reader's second and third choices are worse than a one-in-six
+guess, so they sit below the threshold the rule requires.
+
+The rule is arithmetically correct and was applied to a population it does not
+describe. `p > F1/2` is a statement about *a candidate whose probability you
+know*; the reader's ranked guesses are not calibrated, and its tail is much worse
+than its head. Establish that added items clear the bar before invoking the rule
+— it licenses padding only when padding is with something better than noise.
+
+## A side effect worth recording
+
+Padding also cost MC 0.5854 → 0.5366. The extra locations enter
+`format_evidence()`, which feeds the multiple-choice vote, so diluting evidence
+quality degrades an answer component that was not the target. Changes to the
+evidence stage are not local to evidence.
+
+## Why the third paper helps
+
+`--max-papers 3` lifts cell accuracy 0.2384 → 0.2611 and evidence F1 0.3127 →
+0.3197 with MC unchanged. This is the q_030 mechanism from the other direction:
+multi-paper table rows carry values from papers we had not fetched, and fetching
+one more makes one more row fillable. Consistent with table accuracy being gated
+by paper coverage rather than by table reading.
