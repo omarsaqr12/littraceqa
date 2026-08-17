@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .answer.build import build_record
+from .answer.table_visual import VisualTableSolver
 from .corpus import Paper, PaperPool, Question
 from .pdf.fetch import PDFFetcher
 from .pdf.objects import objects_in_pdf
@@ -56,6 +57,13 @@ class PipelineConfig:
     #: artefact names it does know. One call per question, titles+abstracts only.
     use_llm_selector: bool = False
     llm_shortlist: int = 20
+    #: Read table CELLS off a rendered page instead of out of the evidence
+    #: digest. Row keys stay with the existing logic: exp/14 measured that
+    #: letting the image choose rows too moved row F1 0.5280 -> 0.4591 while
+    #: cell accuracy went 0.0682 -> 0.1591, and the row losses were entirely
+    #: questions the paper-title path already handles (q_027 1.00 -> 0.00).
+    #: Cells and row keys are separable; only cells benefit from the picture.
+    visual_table_cells: bool = False
     #: Put a paper that a mention matches *uniquely* by title n-gram at rank 0,
     #: after reranking. MEASURED AND DISABLED: paper F1 0.490 -> 0.465 overall,
     #: and it loses on the test-like family too (0.846 -> 0.808), which is where
@@ -159,6 +167,9 @@ class Pipeline:
         self.llm_selector = LLMPaperSelector(
             pool, client, shortlist=self.config.llm_shortlist
         ) if (self.config.use_llm_selector and client is not None) else None
+        self.visual_table = VisualTableSolver(
+            client, self.fetcher
+        ) if (self.config.visual_table_cells and client is not None) else None
         self.reader = reader if reader is not None else (
             PaperReader(client) if client is not None else None
         )
@@ -325,7 +336,17 @@ class Pipeline:
                 question, readings, titles
             )
         if "table" in question.answer_types:
-            parts["table"] = self.solver.solve_table(question, readings, titles, papers)
+            table = self.solver.solve_table(question, readings, titles, papers)
+            if self.visual_table is not None and table.get("rows"):
+                # Row keys are already decided above; the image only supplies
+                # cell values. Falls back silently to the digest-built table
+                # when no page can be rendered or the call fails.
+                filled = self.visual_table.fill_cells(
+                    question, table["rows"], readings, papers, self.pool.by_id
+                )
+                if filled and filled.get("rows"):
+                    table = filled
+            parts["table"] = table
         if "freeform" in question.answer_types:
             parts["freeform"] = self.solver.solve_freeform(question, readings, titles)
         return parts

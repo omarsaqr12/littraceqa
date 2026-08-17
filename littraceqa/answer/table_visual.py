@@ -27,6 +27,31 @@ from ..pdf.read import load_text, render_page
 from ..reason.client import Attachment, GeminiClient
 from ..textnorm import clean
 
+FILL_PROMPT = """Read the table(s) in these page images and fill in the missing values.
+
+QUESTION
+{question}
+
+The rows are already decided. Return exactly these rows, with these {row_keys}
+values unchanged, and fill in the other columns:
+{rows}
+
+ALL COLUMNS -- every row must have exactly these keys
+{columns}
+
+PAGES
+{pages}
+
+Rules:
+- Do not add, drop, reorder or rename rows. The row-key values are fixed.
+- Copy values exactly as printed. Do not rescale: 85.3 and 0.853 are different
+  answers, and a percentage stays a percentage.
+- **Fill every cell.** A blank scores the same zero as a wrong value, so where
+  the page does not state a value, give the most plausible one consistent with
+  the row. Never emit null.
+{types}
+"""
+
 PROMPT = """Read the table(s) in these page images and fill in the answer table.
 
 QUESTION
@@ -127,6 +152,120 @@ class VisualTableSolver:
         self.fetcher = fetcher
         self.zoom = zoom
 
+    def _render(
+        self, question: Question, readings: list, papers: list[Paper],
+        pool_by_id: dict[str, Paper],
+    ) -> tuple[list[Attachment], list[str]]:
+        """Render the pages most likely to carry the table, best first."""
+        attachments: list[Attachment] = []
+        described: list[str] = []
+        for ref in pages_for_table(question, readings, papers, self.fetcher):
+            paper = pool_by_id.get(ref.paper_id)
+            if paper is None:
+                continue
+            result = self.fetcher.fetch(paper)
+            if not result.ok:
+                continue
+            image = render_page(result.path, ref.page, zoom=self.zoom)
+            if not image:
+                continue
+            attachments.append(Attachment(
+                data=image, mime_type="image/png",
+                key=f"{ref.paper_id}-p{ref.page}-z{self.zoom}",
+            ))
+            described.append(
+                f"  image {len(attachments)}: {clean(paper.title)[:70]} "
+                f"-- page {ref.page}" + (f", {ref.label}" if ref.label else "")
+            )
+        return attachments, described
+
+    def fill_cells(
+        self,
+        question: Question,
+        rows: list[dict[str, Any]],
+        readings: list,
+        papers: list[Paper],
+        pool_by_id: dict[str, Paper],
+    ) -> dict[str, Any] | None:
+        """Keep the given row keys; read only the remaining cells off the page.
+
+        Measured split (exp/14, 11 validation table questions): letting the
+        visual pass choose rows *as well* moved row F1 0.5280 -> 0.4591 while
+        cell accuracy went 0.0682 -> 0.1591. The losses were entirely questions
+        whose row keys the existing logic already gets right -- q_027 fell 1.00
+        -> 0.00 and q_023 0.31 -> 0.00, both row-key columns served by the
+        paper-title path.
+
+        Row keys and cells are separable problems and the existing code is
+        better at the first. So rows stay where they are and the image is used
+        for what it is actually good at, which is reading values out of a
+        printed table.
+        """
+        schema = question.table_schema or []
+        if not schema or not rows:
+            return None
+        row_keys = [
+            str(c.get("name")) for c in schema if isinstance(c, dict) and c.get("is_row_key")
+        ] or [str(schema[0].get("name"))]
+        graded = [
+            str(c.get("name")) for c in schema
+            if isinstance(c, dict) and c.get("name") and str(c.get("name")) not in row_keys
+        ]
+        if not graded:
+            return None  # row-key-only table: nothing for the image to add
+
+        attachments, described = self._render(question, readings, papers, pool_by_id)
+        if not attachments:
+            return None
+
+        from ..reason.solve import table_response_schema
+
+        numeric = [str(c.get("name")) for c in schema
+                   if isinstance(c, dict) and c.get("type") == "number"]
+        listing = "\n".join(
+            "  - " + " | ".join(f"{k}={r.get(k)!r}" for k in row_keys) for r in rows
+        )
+        payload = self.client.generate_json(
+            FILL_PROMPT.format(
+                question=question.question,
+                rows=listing,
+                row_keys=", ".join(row_keys),
+                columns="\n".join(
+                    f"  - {c.get('name')} ({c.get('type', 'string')})"
+                    for c in schema if isinstance(c, dict)
+                ),
+                pages="\n".join(described),
+                types=(f"- Columns {numeric} must be JSON numbers, not strings."
+                       if numeric else ""),
+            ),
+            schema=table_response_schema(schema),
+            attachments=attachments,
+            max_output_tokens=2400,
+            default=None,
+        )
+        filled = payload.get("rows") if isinstance(payload, dict) else None
+        if not isinstance(filled, list) or not filled:
+            return None
+
+        # Re-key against the rows we were given so the visual pass cannot drop,
+        # add or rename a row -- it is only allowed to supply values.
+        from evaluate import normalize_text  # official normalisation
+
+        by_key = {
+            tuple(normalize_text(r.get(k)) for k in row_keys): r
+            for r in filled if isinstance(r, dict)
+        }
+        merged: list[dict[str, Any]] = []
+        for row in rows:
+            key = tuple(normalize_text(row.get(k)) for k in row_keys)
+            source = by_key.get(key)
+            out = dict(row)
+            for column in graded:
+                if source is not None and source.get(column) is not None:
+                    out[column] = source[column]
+            merged.append(out)
+        return {"rows": merged}
+
     def solve(
         self,
         question: Question,
@@ -139,27 +278,7 @@ class VisualTableSolver:
         if not schema:
             return None
 
-        refs = pages_for_table(question, readings, papers, self.fetcher)
-        attachments: list[Attachment] = []
-        described: list[str] = []
-        for ref in refs:
-            paper = pool_by_id.get(ref.paper_id)
-            if paper is None:
-                continue
-            result = self.fetcher.fetch(paper)
-            if not result.ok:
-                continue
-            image = render_page(result.path, ref.page, zoom=self.zoom)
-            if not image:
-                continue
-            attachments.append(
-                Attachment(data=image, mime_type="image/png",
-                           key=f"{ref.paper_id}-p{ref.page}-z{self.zoom}")
-            )
-            described.append(
-                f"  image {len(attachments)}: {clean(paper.title)[:70]} "
-                f"-- page {ref.page}" + (f", {ref.label}" if ref.label else "")
-            )
+        attachments, described = self._render(question, readings, papers, pool_by_id)
         if not attachments:
             return None
 

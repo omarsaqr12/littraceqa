@@ -1,4 +1,4 @@
-"""E7 -- read the table off the page instead of out of a text digest.
+"""E7b -- keep the existing row keys, read only the CELLS off the page.
 
 Baseline (control run, this session): row F1 0.5280, cell acc 0.2098.
 Success: row F1 >= 0.65 and cell acc >= 0.45.  Kill: cell acc < 0.20.
@@ -50,9 +50,10 @@ for qid, g in gold.items():
     papers=[pool[p] for p in t.get("paper_ids",[]) if p in pool.by_id]
     rf,ca,_=cells(g["answer"]["table"], control[qid]["answer"]["table"]["rows"], schema)
     rowb.append(rf); cellb.append(ca)
-    out=solver.solve(q, rds, papers, pool.by_id)
+    base=control[qid]["answer"]["table"]["rows"]
+    out=solver.fill_cells(q, base, rds, papers, pool.by_id)
     if out is None:
-        rowa.append(rf); cella.append(ca); print(f"  {qid}: no pages -> fell back"); continue
+        rowa.append(rf); cella.append(ca); print(f"  {qid}: no pages -> kept baseline"); continue
     cols={str(c.get("name")):str(c.get("type","string")) for c in (q.table_schema or [])}
     fixed=[_conform_row(r, cols) for r in out["rows"]]
     rf2,ca2,_=cells(g["answer"]["table"], fixed, schema)

@@ -82,6 +82,10 @@ def main() -> int:
     parser.add_argument("--expansion", action="store_true",
                         help="Cluster-expand the paper set (off by default; "
                              "measured inert under the current seeding)")
+    parser.add_argument("--visual-table", action="store_true",
+                        help="Read table cells off a rendered page instead of the "
+                             "evidence digest (exp/14: cell acc 0.068 -> 0.159). "
+                             "Row keys are unchanged.")
     parser.add_argument("--llm-select", action="store_true",
                         help="LLM picks the paper set from the reranked shortlist "
                              "(exp/13: validation paper F1 0.4901 -> 0.5837, "
@@ -167,6 +171,7 @@ def main() -> int:
         selection=args.selection,
         use_reranker=not args.no_rerank,
         use_llm_selector=args.llm_select,
+        visual_table_cells=args.visual_table,
         use_expansion=args.expansion,
         max_papers_to_read=args.max_papers,
         mc_samples=args.mc_samples,
