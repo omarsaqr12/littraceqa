@@ -168,7 +168,7 @@ class GeminiClient:
 
     def _cache_path(
         self, prompt: str, attachments: list[Attachment], schema: Any, model: str,
-        extra_config: Any = None,
+        extra_config: Any = None, thinking_budget: Any = None,
     ) -> Path:
         digest = hashlib.sha256()
         digest.update(model.encode())
@@ -181,6 +181,12 @@ class GeminiClient:
             digest.update(json.dumps(schema, sort_keys=True, default=str).encode())
         if extra_config:
             digest.update(json.dumps(extra_config, sort_keys=True, default=str).encode())
+        # Part of the key: it changes the request, so two budgets must not share
+        # a cache entry. Omitting it made a thinking-on run silently replay the
+        # thinking-off responses and report an identical score, which reads as
+        # "the variable had no effect" rather than "the variable was not tested".
+        if thinking_budget is not None:
+            digest.update(f"|think={thinking_budget}".encode())
         return self.cache_dir / f"{digest.hexdigest()[:32]}.json"
 
     # -- attachments ---------------------------------------------------------
@@ -234,7 +240,8 @@ class GeminiClient:
         """
         attachments = attachments or []
         model = model or self.model
-        path = self._cache_path(prompt, attachments, schema, model, extra_config)
+        path = self._cache_path(prompt, attachments, schema, model, extra_config,
+                                thinking_budget)
         if use_cache and path.exists():
             # Only a hit if the *same* model produced it. The entry is written
             # under the key of whichever model actually answered, but an older
