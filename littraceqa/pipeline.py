@@ -57,6 +57,10 @@ class PipelineConfig:
     #: artefact names it does know. One call per question, titles+abstracts only.
     use_llm_selector: bool = False
     llm_shortlist: int = 20
+    #: Independent selector passes, majority-voted. Selection is the binding
+    #: constraint on paper F1 (86% of what the shortlist permits), so this is
+    #: the cheapest remaining accuracy on the heaviest component.
+    llm_select_samples: int = 1
     #: Read table CELLS off a rendered page instead of out of the evidence
     #: digest. Row keys stay with the existing logic: exp/14 measured that
     #: letting the image choose rows too moved row F1 0.5280 -> 0.4591 while
@@ -165,7 +169,8 @@ class Pipeline:
         # Any object with PaperReader's `read()` signature: the hosted reader,
         # or `reason.local_llm.LocalReader` running on the GPU with no quota.
         self.llm_selector = LLMPaperSelector(
-            pool, client, shortlist=self.config.llm_shortlist
+            pool, client, shortlist=self.config.llm_shortlist,
+            samples=self.config.llm_select_samples
         ) if (self.config.use_llm_selector and client is not None) else None
         self.visual_table = VisualTableSolver(
             client, self.fetcher

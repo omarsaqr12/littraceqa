@@ -173,3 +173,40 @@ What the three runs establish, holding one stage at a time:
 
 Evidence P > R in all three runs (.444 vs .364 in v6), so we are still emitting
 fewer items than gold on a metric that never rewards abstention.
+
+### Later submissions
+
+| submitted | file | paper F1 | evid F1 | MC | row F1 | cell acc | **overall** |
+|---|---|---|---|---|---|---|---|
+| 16 Aug | `test_v6_hosted` | .6474 | .3887 | .820 | .2849 | .0952 | 0.4787 |
+| 17 Aug | **`test_v9`** | **.7991** | **.4737** | .780 | .2738 | .0952 | **0.5519** |
+| 17 Aug | `test_v10` | .7991 | .4737 | .780 | .2738 | .0952 | 0.5519 |
+| 17 Aug | `test_v11` | .7967 | .4667 | .820 | .2738 | .0595 | 0.5493 |
+
+v9 = `--llm-select --visual-table --max-papers 3`. v10 added the duplicate-row
+merge fix and scored **identically to six decimals**. v11 added `--llm-shortlist
+30` and lost 0.0026.
+
+## 7. Validation deltas under ~0.02 do not transfer
+
+| change | validation Δ | test Δ |
+|---|---|---|
+| LLM candidate selection | **+0.0542** | **+0.0732** |
+| visual table cells | +0.0051 | 0.0000 |
+| duplicate-row merge fix | 0.0000 | 0.0000 |
+| shortlist 20 → 30 | +0.0109 | **−0.0026** |
+
+Only the large effect transferred, and it transferred amplified. Every change
+measuring under 0.02 on validation landed at or below zero on test.
+
+This is what 55 questions can and cannot support. A bootstrap CI on the
+selector-self-consistency delta makes it concrete: **+0.0085 paper F1, 95% CI
+[−0.0229, +0.0515]**, from 4 changed questions out of 55. The interval is three
+times wider than the effect. Three of the four shipped changes above were decided
+inside that band, and the two that were measurable on test both came back at
+zero or worse.
+
+**Operating rule for the remaining time: do not ship on a validation delta below
+0.02 without a wider measurement.** The cost of ignoring this is visible above —
+three submissions spent to learn nothing, while the one change that mattered was
+large enough to see through the noise.

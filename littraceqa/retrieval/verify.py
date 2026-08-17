@@ -19,6 +19,7 @@ PDFs -- so it is cheap relative to the reading stage.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 
 from ..corpus import Paper, PaperPool
@@ -90,12 +91,14 @@ class LLMPaperSelector:
         shortlist: int = 20,
         abstract_chars: int = 420,
         max_selected: int = 8,
+        samples: int = 1,
     ):
         self.pool = pool
         self.client = client
         self.shortlist = shortlist
         self.abstract_chars = abstract_chars
         self.max_selected = max_selected
+        self.samples = samples
 
     def _render(self, papers: list[Paper]) -> str:
         lines = []
@@ -109,33 +112,66 @@ class LLMPaperSelector:
         return "\n\n".join(lines)
 
     def select(self, question: str, candidate_ids: list[str]) -> Selection:
+        """Pick the papers, optionally voting over several independent attempts.
+
+        Selection is now the binding constraint on paper F1, not retrieval:
+        recognition accuracy is 86% of what the shortlist permits, and coverage
+        saturates by top-30. On the test-like family only 1 of 62 candidate
+        misses is a coverage failure — everything else is the cluster regime,
+        where 77% of gold papers are never named in their own question and no
+        retriever can reach them.
+
+        Voting targets exactly that 14%: a paper chosen by a majority of
+        independent passes is more likely right than one chosen once, and this
+        is the cheapest accuracy available on a stage that costs one call.
+        """
         candidates = [self.pool[p] for p in candidate_ids[: self.shortlist] if p in self.pool.by_id]
         if not candidates:
             return Selection([], 0, ok=False)
 
-        payload = self.client.generate_json(
-            PROMPT.format(question=question, candidates=self._render(candidates)),
-            schema=SELECT_SCHEMA,
-            max_output_tokens=2048,
-            default=None,
-        )
-        if not isinstance(payload, dict):
-            # Fall back to the retriever's own order rather than returning nothing.
+        prompt = PROMPT.format(question=question, candidates=self._render(candidates))
+        votes: Counter[str] = Counter()
+        expectations: list[int] = []
+        rounds = 0
+        for attempt in range(max(1, self.samples)):
+            # Attempt 0 is greedy and cached; later attempts vary the cache key
+            # so they are genuinely separate samples rather than the same reply.
+            payload = self.client.generate_json(
+                prompt if attempt == 0 else f"{prompt}\n\n(independent attempt {attempt + 1})",
+                schema=SELECT_SCHEMA,
+                max_output_tokens=2048,
+                default=None,
+            )
+            if not isinstance(payload, dict):
+                continue
+            rounds += 1
+            seen: set[str] = set()
+            for item in payload.get("selected") or []:
+                if not isinstance(item, dict):
+                    continue
+                index = item.get("index")
+                if isinstance(index, int) and 0 <= index < len(candidates):
+                    paper_id = candidates[index].paper_id
+                    if paper_id not in seen:
+                        seen.add(paper_id)
+                        votes[paper_id] += 1
+            expected = payload.get("expected_count")
+            if isinstance(expected, int) and expected > 0:
+                expectations.append(expected)
+
+        if not rounds:
             return Selection([candidates[0].paper_id], 1, ok=False)
 
-        chosen: list[str] = []
-        for item in payload.get("selected") or []:
-            if not isinstance(item, dict):
-                continue
-            index = item.get("index")
-            if isinstance(index, int) and 0 <= index < len(candidates):
-                paper_id = candidates[index].paper_id
-                if paper_id not in chosen:
-                    chosen.append(paper_id)
-
-        expected = payload.get("expected_count")
-        expected = expected if isinstance(expected, int) and expected > 0 else len(chosen)
-
+        expected = (
+            sorted(expectations)[len(expectations) // 2] if expectations else len(votes)
+        )
+        # Keep papers a majority of attempts agreed on; if that empties the set,
+        # fall back to the most-voted, since abstaining scores the same zero as
+        # being wrong.
+        threshold = (rounds + 1) // 2
+        chosen = [p for p, n in votes.most_common() if n >= threshold]
+        if not chosen:
+            chosen = [p for p, _ in votes.most_common(max(1, expected))]
         if not chosen:
             return Selection([candidates[0].paper_id], expected, ok=False)
         return Selection(chosen[: self.max_selected], expected)
