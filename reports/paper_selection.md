@@ -89,3 +89,61 @@ Kill criteria should be stated on the metric the change is expected to move, not
 on the sub-population that happens to be most familiar. Recorded because the
 number was nearly discarded on the strength of a label the experiment printed
 about itself.
+
+---
+
+## H7 killed: our wrong papers do mention the artefact
+
+Paper precision is 0.817 on test, so roughly one returned paper in five is wrong.
+The plan's C1 step 3 proposed dropping candidates whose full text never mentions
+the question's artefacts — a near-false-positive-free test, and free once the PDF
+is cached.
+
+Measured over the 55 validation questions, reusing the shipped pipeline's own
+paper sets so nothing but the filter varies:
+
+```
+            P        R       F1
+before  0.7582   0.5364   0.5837
+after   0.7612   0.5364   0.5850
+papers dropped: 1 (0 of them gold)
+```
+
+**Precision +0.0030 against a 0.05 kill threshold.** One paper dropped in 55
+questions.
+
+The mechanism matters more than the number. Our wrong papers are *not* papers
+that fail to mention the artefact — they mention it and are still not the
+subject. A question about `IMM` retrieves several diffusion-distillation papers
+that all discuss IMM; only one introduced it. Full-text presence would have
+discriminated against the errors the *pre-LLM* retriever made (topically similar,
+artefact absent), and the LLM selector already removes those. The filter is
+solving a problem that stage no longer has.
+
+## Where the paper ceiling actually is
+
+Gold coverage of the candidate list, validation:
+
+| depth | gold recall | ceiling at 86% selection accuracy |
+|---|---|---|
+| top-10 | 0.6414 | 0.5516 |
+| top-20 | 0.6859 | 0.5898 |
+| top-30 | 0.7030 | 0.6046 |
+| top-40 | 0.7030 | 0.6046 |
+
+At top-20 we score 0.5837 against a 0.5898 ceiling — **the selector is at 99% of
+what its shortlist permits**. Coverage saturates by top-30, so nothing deeper
+helps.
+
+Deepening the shortlist to 30 is worth what the table predicts:
+
+| config | paper F1 | P | R | evidence | overall |
+|---|---|---|---|---|---|
+| shortlist 20 | 0.5837 | 0.758 | 0.536 | 0.3197 | 0.4545 |
+| **shortlist 30** | **0.5929** | 0.776 | 0.545 | 0.3223 | **0.4653** |
+
+Past that, paper F1 is bounded by **candidate generation recall (0.703)**, not by
+selection or verification. Any further gain has to come from putting gold in the
+list in the first place — which is the one thing that has resisted every method
+tried: BM25, dense, cross-encoder rerank, acronym and nickname indices, and
+title generation.

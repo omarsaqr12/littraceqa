@@ -86,6 +86,10 @@ def main() -> int:
                         help="Read table cells off a rendered page instead of the "
                              "evidence digest (exp/14: cell acc 0.068 -> 0.159). "
                              "Row keys are unchanged.")
+    parser.add_argument("--llm-shortlist", type=int, default=20,
+                        help="Candidates shown to the LLM selector. Gold coverage "
+                             "saturates at top-30 (0.686 -> 0.703); beyond that the "
+                             "limit is candidate generation, not selection.")
     parser.add_argument("--llm-select", action="store_true",
                         help="LLM picks the paper set from the reranked shortlist "
                              "(exp/13: validation paper F1 0.4901 -> 0.5837, "
@@ -171,6 +175,7 @@ def main() -> int:
         selection=args.selection,
         use_reranker=not args.no_rerank,
         use_llm_selector=args.llm_select,
+        llm_shortlist=args.llm_shortlist,
         visual_table_cells=args.visual_table,
         use_expansion=args.expansion,
         max_papers_to_read=args.max_papers,
