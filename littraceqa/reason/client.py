@@ -167,7 +167,8 @@ class GeminiClient:
     # -- cache ---------------------------------------------------------------
 
     def _cache_path(
-        self, prompt: str, attachments: list[Attachment], schema: Any, model: str
+        self, prompt: str, attachments: list[Attachment], schema: Any, model: str,
+        extra_config: Any = None,
     ) -> Path:
         digest = hashlib.sha256()
         digest.update(model.encode())
@@ -178,6 +179,8 @@ class GeminiClient:
             digest.update(attachment.cache_key().encode())
         if schema is not None:
             digest.update(json.dumps(schema, sort_keys=True, default=str).encode())
+        if extra_config:
+            digest.update(json.dumps(extra_config, sort_keys=True, default=str).encode())
         return self.cache_dir / f"{digest.hexdigest()[:32]}.json"
 
     # -- attachments ---------------------------------------------------------
@@ -219,11 +222,18 @@ class GeminiClient:
         model: str | None = None,
         max_output_tokens: int = 2048,
         use_cache: bool = True,
+        extra_config: dict[str, Any] | None = None,
     ) -> str:
-        """Return raw model text. `schema` requests structured JSON output."""
+        """Return raw model text. `schema` requests structured JSON output.
+
+        `extra_config` passes provider options straight through -- notably
+        `{"tools": [{"google_search": {}}]}` for search grounding, which the
+        identify stage needs and which cannot be combined with `schema`
+        (structured output and tool use are mutually exclusive on this API).
+        """
         attachments = attachments or []
         model = model or self.model
-        path = self._cache_path(prompt, attachments, schema, model)
+        path = self._cache_path(prompt, attachments, schema, model, extra_config)
         if use_cache and path.exists():
             # Only a hit if the *same* model produced it. The entry is written
             # under the key of whichever model actually answered, but an older
@@ -249,6 +259,8 @@ class GeminiClient:
         if schema is not None:
             config["response_mime_type"] = "application/json"
             config["response_schema"] = schema
+        if extra_config:
+            config.update(extra_config)
         if self.thinking_budget is not None:
             try:
                 config["thinking_config"] = types.ThinkingConfig(

@@ -29,6 +29,7 @@ from .retrieval.lexical import BM25Index, NicknameIndex, extract_nicknames
 from .retrieval.scope import extract_scope
 from .retrieval.rerank import CrossEncoderReranker
 from .retrieval.select import MentionAnchoredSelector
+from .retrieval.verify import LLMPaperSelector
 
 
 @dataclass
@@ -48,6 +49,13 @@ class PipelineConfig:
     #: artefact name gives the cross-encoder too little context.
     rerank_mode: str = "question"
     rerank_prior_weight: float = 0.5
+    #: LLM picks the final paper set out of the reranked shortlist. MEASURED WIN
+    #: (exp/13): validation paper F1 0.4901 -> 0.5837, precision 0.614 -> 0.758.
+    #: Recognition, not recall -- asking the same model to *generate* the title
+    #: instead (exp/12) scored 0.2170, because it invents plausible titles around
+    #: artefact names it does know. One call per question, titles+abstracts only.
+    use_llm_selector: bool = False
+    llm_shortlist: int = 20
     #: Put a paper that a mention matches *uniquely* by title n-gram at rank 0,
     #: after reranking. MEASURED AND DISABLED: paper F1 0.490 -> 0.465 overall,
     #: and it loses on the test-like family too (0.846 -> 0.808), which is where
@@ -148,6 +156,9 @@ class Pipeline:
         )
         # Any object with PaperReader's `read()` signature: the hosted reader,
         # or `reason.local_llm.LocalReader` running on the GPU with no quota.
+        self.llm_selector = LLMPaperSelector(
+            pool, client, shortlist=self.config.llm_shortlist
+        ) if (self.config.use_llm_selector and client is not None) else None
         self.reader = reader if reader is not None else (
             PaperReader(client) if client is not None else None
         )
@@ -210,6 +221,15 @@ class Pipeline:
                 ranked.insert(0, paper_id)
 
         trace.candidates = ranked
+
+        if self.llm_selector is not None and ranked:
+            selection = self.llm_selector.select(question.question, ranked)
+            if selection.paper_ids:
+                trace.paper_ids = selection.paper_ids[: cfg.max_set_size]
+                trace.seeds = trace.paper_ids
+                trace.predicted_size = len(trace.paper_ids)
+                trace.size_reason = f"llm-selected (expected {selection.expected_count})"
+                return trace
 
         if cfg.selection == "mention_anchored":
             trace.paper_ids = self.selector.select(

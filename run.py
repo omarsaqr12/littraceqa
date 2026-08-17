@@ -82,6 +82,10 @@ def main() -> int:
     parser.add_argument("--expansion", action="store_true",
                         help="Cluster-expand the paper set (off by default; "
                              "measured inert under the current seeding)")
+    parser.add_argument("--llm-select", action="store_true",
+                        help="LLM picks the paper set from the reranked shortlist "
+                             "(exp/13: validation paper F1 0.4901 -> 0.5837, "
+                             "precision 0.614 -> 0.758). One call per question.")
     parser.add_argument("--no-rerank", action="store_true",
                         help="Disable cross-encoder reranking of candidates "
                              "(exp/08: paper F1 0.410 -> 0.490, single-paper "
@@ -162,6 +166,7 @@ def main() -> int:
     config = PipelineConfig(
         selection=args.selection,
         use_reranker=not args.no_rerank,
+        use_llm_selector=args.llm_select,
         use_expansion=args.expansion,
         max_papers_to_read=args.max_papers,
         mc_samples=args.mc_samples,
