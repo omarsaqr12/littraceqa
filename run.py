@@ -187,6 +187,15 @@ def main() -> int:
         max_papers_to_read=args.max_papers,
         mc_samples=args.mc_samples,
     )
+    # Print the config the run actually used. Three of this project's four
+    # measurement failures were invisible in the results and obvious in a config
+    # dump: an A/B arm taken from a different config, a cache key missing
+    # thinking_budget, and an experiment whose flag defaulted to False.
+    print("CONFIG: " + " ".join(
+        f"{k}={v}" for k, v in sorted(vars(config).items())
+        if not k.startswith("_")), flush=True)
+    print(f"CONFIG: reader={args.reader} models={args.models} rpm={args.rpm} "
+          f"max_papers={args.max_papers} mc_samples={args.mc_samples}", flush=True)
     print("building indices ...", flush=True)
     pipeline = Pipeline(pool, config=config, client=client, fetcher=PDFFetcher(),
                         reader=reader)

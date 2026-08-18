@@ -228,8 +228,24 @@ class AnswerSolver:
         # Free win: when the row key is a paper-title column, gold row values are
         # the pool's `title` field verbatim (entities and all). Emit those rather
         # than letting the model paraphrase -- row F1 then tracks paper F1 exactly.
-        if len(columns) == 1 and _is_title_column(columns[0]) and papers:
-            return {"rows": [{columns[0]: p.title} for p in papers]}
+        #
+        # This used to require the table to have exactly ONE column, which is why
+        # it fired on 18% of validation questions and **0% of test** (exp/20): no
+        # test table has a single column -- 8 have two and 13 have three. Four
+        # test questions key on `paper` and were handing their row keys to the
+        # model, which paraphrases the title and loses an exact-match grade it
+        # could have had for free.
+        #
+        # Now it pins the title column whenever the row key is title-ish, and
+        # leaves the remaining columns to be filled as cells.
+        if papers and _is_title_column(row_keys[0]):
+            seeded = [{row_keys[0]: p.title} for p in papers]
+            if len(columns) == 1:
+                return {"rows": seeded}
+            filled = self._fill_remaining(question, seeded, readings, titles, schema)
+            if filled:
+                return filled
+            return {"rows": [_complete_row(r, schema) for r in seeded]}
 
         column_lines = "\n".join(
             f"  - {c.get('name')} ({c.get('type', 'string')})"
@@ -262,6 +278,56 @@ class AnswerSolver:
                 return {"rows": [_complete_row({row_keys[0]: p.title}, schema) for p in papers]}
             return {"rows": [_complete_row({}, schema)]}
         return {"rows": [_complete_row(r, schema) for r in rows if isinstance(r, dict)]}
+
+
+    def _fill_remaining(
+        self,
+        question: Question,
+        rows: list[dict[str, Any]],
+        readings: list[Reading],
+        titles: dict[str, str],
+        schema: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        """Fill non-row-key columns for rows whose keys are already pinned."""
+        row_keys = [str(c.get("name")) for c in schema if c.get("is_row_key")]
+        graded = [str(c.get("name")) for c in schema
+                  if c.get("name") and str(c.get("name")) not in row_keys]
+        if not graded:
+            return None
+        listing = "\n".join(
+            f"  {i}. " + " | ".join(f"{k}={r.get(k)!r}" for k in row_keys)
+            for i, r in enumerate(rows, start=1)
+        )
+        payload = self.client.generate_json(
+            TABLE_PROMPT.format(
+                question=question.question,
+                columns="\n".join(
+                    f"  - {c.get('name')} ({c.get('type','string')})"
+                    + ("  [ROW KEY -- already fixed, copy it unchanged]"
+                       if c.get("is_row_key") else "")
+                    for c in schema if isinstance(c, dict)
+                ),
+                evidence=(f"The rows are already decided; return these exact rows in this "
+                          f"order and fill the other columns:\n{listing}\n\n"
+                          + format_evidence(readings, titles)),
+                types="",
+            ),
+            schema=table_response_schema(schema),
+            max_output_tokens=2400,
+            default=None,
+        )
+        out = payload.get("rows") if isinstance(payload, dict) else None
+        if not isinstance(out, list) or len(out) != len(rows):
+            return None
+        merged = []
+        for base, extra in zip(rows, out):
+            row = dict(base)
+            if isinstance(extra, dict):
+                for column in graded:
+                    if extra.get(column) is not None:
+                        row[column] = extra[column]
+            merged.append(_complete_row(row, schema))
+        return {"rows": merged}
 
     # -- freeform -------------------------------------------------------------
 

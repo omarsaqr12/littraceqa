@@ -116,3 +116,71 @@ evidence stage are not local to evidence.
 multi-paper table rows carry values from papers we had not fetched, and fetching
 one more makes one more row fillable. Consistent with table accuracy being gated
 by paper coverage rather than by table reading.
+
+---
+
+# F2 — why table collapses from validation to test
+
+Test is easier than validation on paper, evidence and MC, and 2-3x worse on both
+table metrics. That is a signature, not a difficulty gradient, so it was worth
+chasing.
+
+## First hypothesis: the paper-title path stops firing. True, and not the cause.
+
+The free win (row values = the pool's `title` verbatim) required the table to
+have exactly **one** column. Schema survey (`exp/20`):
+
+| | validation | test |
+|---|---|---|
+| single-column tables | 3/11 | **0/21** |
+| paper-title path fires | 18% | **0%** |
+| title-ish key **with** extra columns | 0% | **19%** |
+
+No test table has one column -- 8 have two, 13 have three -- so four test
+questions keying on `paper` were handing their row keys to the model instead of
+pinning the pool title. Generalised the path to fire on any title-ish row key,
+filling the remaining columns as cells.
+
+**Measured effect: nearly nothing.**
+
+```
+v9  (before)  title-key rows exactly matching a pool title:  9/10
+v12 (after)   title-key rows exactly matching a pool title:  9/9
+```
+
+The model was already emitting exact pool titles. One row changed. The fix is
+still right in principle -- it makes exactness structural rather than dependent
+on the model paraphrasing correctly -- but it is not worth the +0.046 the schema
+difference suggested, and it does not explain the collapse.
+
+## Actual cause: the two splits ask for different kinds of row key
+
+Validation gold row-key values are **entity names**, short and canonical and
+present verbatim in the question:
+
+```
+q_028  Method      TCM, sCT, ECM-XL, IMM
+q_030  Method      MoST, PMA, PointLoRA, RISurConv
+q_052  Benchmarks  SUN RGB-D, ARKitScenes, Hypersim, Objectron
+q_027  Author      Nikos Athanasiou
+```
+
+Test row-key **columns** are descriptors: `quantity`, `adaptation_setting`,
+`method_metric`, `setting`, `attribute`, `cited_work`. Their values are phrases
+-- "number of optimization iterations for NeRF editing", "contrastive-learning
+pre-training learning rate" -- and `row_key_value` grades them by exact string
+match after normalisation.
+
+Reproducing an entity name is a lookup. Reproducing a descriptive phrase someone
+else wrote is not, and no amount of reading the paper makes the wording
+predictable. 8 of 21 test tables key on a descriptor; 11 of 11 validation tables
+key on an entity or a title.
+
+This bounds what the table component can return on test, and it means validation
+cannot be used to tune it: the mechanism that fails on test does not occur on
+validation at all.
+
+The remaining idea (H10 -- extract row keys verbatim from the question's noun
+phrases rather than letting the model compose them) targets exactly these 8
+questions and is untestable on validation for the same reason. It is recorded,
+not shipped.
