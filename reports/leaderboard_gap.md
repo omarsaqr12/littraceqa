@@ -210,3 +210,45 @@ zero or worse.
 0.02 without a wider measurement.** The cost of ignoring this is visible above —
 three submissions spent to learn nothing, while the one change that mattered was
 large enough to see through the noise.
+
+
+## 8. Run-to-run variance is larger than most changes measured
+
+v9, v10 and v12 ran **identical paper-selection config**. v10 differed only in the
+table merge code, v12 only in the title pin; neither touches selection.
+
+| comparison | paper sets differ | MC differs | overall |
+|---|---|---|---|
+| v9 vs v10 (fully cached) | 0/71 | 0/50 | 0.5519 = 0.5519 |
+| **v9 vs v12 (same config, fresh calls)** | **9/71** | 1/50 | 0.5519 → 0.5413 |
+| v9 vs v11 (shortlist 30, real change) | 17/71 | 9/50 | 0.5519 → 0.5493 |
+
+Nine questions of selector nondeterminism cost **0.0211 paper F1, 0.0200 MC, and
+0.0106 overall**. v10 reproducing v9 exactly shows the pipeline is deterministic
+*given cache hits*; the divergence appears when calls are actually made, so it is
+transient API behaviour rather than a code path.
+
+**±0.011 is larger than every change measured since v9.** The visual table
+(+0.0051 val), shortlist 30 (+0.0109 val), the merge fix (0.0000) and the title
+pin (0.0000) all sit inside it. v9 (0.5519), v11 (0.5493) and v12 (0.5413) are
+within two variance units of one another, and treating their ordering as a
+ranking of configurations would be reading noise.
+
+A 2-of-3 consensus over v9/v11/v12 was built to average the variance out. It
+matched v9 on **all 71 questions** — v9's paper set is in the majority every
+time, so it is the central draw rather than a lucky one. Nothing to submit.
+
+### Consequence for the remaining time
+
+Anything worth shipping now has to clear ~0.02 on test, which is roughly the
++0.0732 that LLM selection delivered and nothing since has approached. The
+measured levers that remain are large but do not fit the schedule:
+
+* **Full-text indexing.** Title+abstract reachability is 71%, exactly the
+  candidate-recall ceiling; adding body text raises it to 89%. Building it needs
+  a venue-scoped PDF corpus (ICCV 2025 alone is 2,701 papers) and the body-only
+  hits measured are concentrated in the `multi_paper` cluster regime, which is a
+  validation phenomenon more than a test one.
+* **Row keys as free text.** 8 of 21 test tables key on a descriptor whose gold
+  value is someone else's phrasing, graded by exact match. Untunable on
+  validation, where 0 of 11 tables have that shape.
