@@ -184,3 +184,74 @@ The remaining idea (H10 -- extract row keys verbatim from the question's noun
 phrases rather than letting the model compose them) targets exactly these 8
 questions and is untestable on validation for the same reason. It is recorded,
 not shipped.
+
+---
+
+## Row keys from a dedicated question-only call (H10/H20): verified on validation, ~zero on test
+
+Row F1 is a set F1 over row-key strings graded by exact match after
+`normalize_text`. The combined table call receives the papers' evidence alongside
+the question and drifts to the *papers'* wording, but the grader who wrote gold
+also wrote the question, so question wording is the better prior. 44% of gold row
+keys appear verbatim in the question text.
+
+`--row-key-extract` splits the stage: one call decides row keys from the question
+alone, then `_fill_remaining` fills cells against fixed keys.
+
+**Ungated it loses 0.129.** On a discovery question ("Which CVPR 2025 papers cite
+UniAD ...") the question does not name the rows, and the extractor either returns
+nothing or fabricates an entity — it replaced a correct author, which the combined
+call had read out of a reference list, with an invented name.
+
+The fix is a grounding guard: every extracted key must appear in the question
+after stripping a trailing parenthetical. That separates enumerated questions from
+discovery ones exactly. Guarded, on the 10 single-row-key validation table
+questions (`exp/22`):
+
+| question | key column | combined call | guarded extractor | route |
+|---|---|---|---|---|
+| q_028 | Method | 0.750 | **1.000** | extractor |
+| q_029 | Method | 0.750 | **1.000** | extractor |
+| q_027 | Author | 1.000 | 1.000 | fallback (not grounded) |
+| q_020, q_023 | Paper Title | 0.222 / 0.571 | unchanged | title pin |
+| q_030, q_052, q_054, q_056, q_022 | — | — | unchanged | — |
+| **mean** | | **0.6044** | **0.6544** | **+0.0500** |
+
+Both wins are the qualifier rule: gold is `ECM-XL` where the question wrote
+`ECM-XL (100k iterations)`, and `ECM-XL (102.4M)` where it wrote
+`ECM-XL (with 102.4M training budget)`. No question regressed.
+
+### On test it changes five questions, and two of them look worse
+
+Routing over the 21 test table questions: **4 title-pin, 14 grounded, 3 fallback**.
+But for 11 of the 14 grounded the extracted keys are *identical* to what already
+ships — those questions were already question-derived. `test_v16` differs from v9
+on 5 row-key sets:
+
+| key column | v9 | v16 | judgement |
+|---|---|---|---|
+| `dataset` | `cosql`, `sparc` | `cosql validation set`, `sparc validation set` | **longer, likely worse** |
+| `attribute` | `number of annotators` | `number of annotators used` | **longer, likely worse** |
+| `quantity` | `plotted ratio for the lowest problem-difficulty value` | `lowest problem-difficulty value` | shorter, plausibly better |
+| `paper` | clean `cot-icl lab: ...` | mangled `c o t - icl lab: ...` | verbatim pool title, plausibly better |
+| `paper` | 2 keys | 1 key | worse, and caused by selector variance not this flag |
+
+**The validation lesson and the test behaviour disagree.** Validation taught that
+gold *shortens* what the question spells out; on test, copying the question
+verbatim made two keys *longer*, because the question really does say "validation
+sets". "Question-verbatim" and "shortest form" are different rules that happened
+to coincide on validation, and nothing available locally says which one gold used.
+
+Two further reasons `test_v16` is not a clean read of this flag:
+
+* **It is not single-variable.** 4 of 71 paper sets differ from v9 purely from
+  selector nondeterminism, one of which cost a table row.
+* **v9 predates the generalised title pin** (added in v12, which scored 0.5413
+  against v9's 0.5519). Current code therefore differs from v9 on the 4
+  `paper`-keyed questions as well.
+
+**Conclusion: the mechanism is real and measured, and its test footprint is not.**
+Expected overall movement is ~±0.006, comfortably inside the ±0.011 run-to-run
+band. Under this repo's own rule — do not ship on a validation delta below 0.02 —
+`--row-key-extract` does not qualify on its own, and it is kept behind a flag,
+default off.
