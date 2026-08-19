@@ -383,3 +383,34 @@ type mismatch.
 `preds/` and `logs/` are gitignored (generated outputs; the dataset is CC BY-NC and
 not vendored), so these reports are the record. `test_v22` differs from the scored
 v19 on six questions, every one PDF-verified.
+
+## Wrong-row reads: the dominant cell failure, found by verifying semantically
+
+"Value appears in the paper" does not mean correct — that was the wrong test. Every
+cell defect found since is a **wrong-row read**: the right table, the right paper,
+the wrong line or column. Attestation triage cannot see these because the number is
+genuinely printed.
+
+| question | we emitted | that number is actually | correct |
+|---|---|---|---|
+| ConECT chrF/COMET | 38.01 / 0.6537, 48.50 / 0.7774 | the **NLLB-600M** row | Baseline row: **83.73 / 0.9227** and **70.76 / 0.9335** |
+| AccidentalGS NeRFmm RPEr | 2.923, 4.937 | NeRFmm's **RPEt** row, and 4.937 is the Off-1 column | **11.568, 9.66** |
+| AccidentalGS BARF ATE | 3.727, 7.037 | BARF's **RPEr** row | **0.413, 10.297** |
+
+The ConECT one matters most as a lesson: NLLB-600M is a separate pretrained system,
+while the question asks for "the ConECT baseline". The paper's `Baseline` row is its
+own from-scratch text-to-text model (A.2 p8: 32k shared SentencePiece vocab, tied
+embeddings, 53M pairs). Both rows sit in the same table on p5 and both are fully
+attested.
+
+Verified **correct** and left untouched, which is as important as the fixes:
+
+* **RetrieverGuard** (`naacl2025_00889` Table 6 p13): all **8** cells right —
+  SciFact 69.3/63.2, HotpotQA 78.6/68.5, NFCorpus 31.8/11.2, Climate-FEVER
+  35.7/25.5, each read from the `RetrieverGuard (Stella-400M) …+Fake2` rows.
+* **Track-SQL** (`naacl2025_01103` Table 13 p17): SESE inference totals 240.348s
+  (SparC) and 214.456s (CoSQL) both right.
+
+Running total against the scored v19 (0.5602): **11 questions**, 5 paper sets,
+3 multiple-choice answers, 6 evidence sets and **15 table cells**, every change
+citing a page.
