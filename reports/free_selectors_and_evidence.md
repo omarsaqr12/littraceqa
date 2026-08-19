@@ -338,3 +338,38 @@ Both are small. The honest read is that the paper stage is within ~0.04 of what
 this architecture supports, and the deficit against rank 1 (0.7837 vs 0.5519) is
 not in paper selection at all — it is the table stage (row F1 0.274, cell accuracy
 0.095), which is 1/3 of the answer score and where this project measured the least.
+
+## Two more MC answers corrected (v37)
+
+Ranking each paper's pages by how well they support the chosen option, then
+reviewing where the page we cite lands, turned up two answers that were simply
+wrong -- not mis-cited, wrong.
+
+**`ltqa_d2b9a56db69fe43c`** -- "which two papers cite Dong-Hyun Lee's
+pseudo-label work?" We answered "all three" and cited
+`neurips2025_04917`, which is not one of the three papers the options name.
+Fetched all three and read their bibliographies:
+
+| paper | cites Lee |
+|---|---|
+| `iccv2025_02125` Semi-supervised Concept Bottleneck Models | yes, `[28]`, and p3 carries the question's own phrasing "reducing the entropy of unlabeled data [28]" |
+| `iccv2025_02128` SemiVisBooster | yes, `[21]`, in text on p2 |
+| `iccv2025_02075` SCAN | **no** |
+
+So it is the two, option A. Answer, paper set and evidence all corrected.
+
+**`ltqa_f0de7fb4352ad29c`** -- three counts, and we had two of them wrong:
+
+| quantity | paper says | our option C | correct option D |
+|---|---|---|---|
+| KMI decision-module rules | "Based on two simple rules" (p5) | 2 | 2 |
+| MASER initialization elements | "prompt GPT-4o to extract six initialization elements" (p3) | 7 | 6 |
+| M2Lingual multi-turn Evol prompts | "taxonomy with 21 distinct dialogue variations" (p4) | 17 | 21 |
+
+All three now cite the page that states the number.
+
+Note what the page ranking is and is not good for. It cannot tell a right page
+from a wrong one -- several pages I had already verified by hand rank third or
+fourth, because a results table repeats the paper's vocabulary less than the
+intro does. What it does reliably is find pages that support the answer with
+*nothing*, and those are worth opening.
