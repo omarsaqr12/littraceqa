@@ -342,3 +342,43 @@ be printed, and only per-question reading fixes that.
 `test_v28` adds the sixth paper fix, the `MDBPE` row key (the paper names itself that
 in Figure 1 and its repo URL), and the MedVLP/Trokens cell corrections. 121 evidence
 items.
+
+## A seventh wrong paper, and the cleanest distractor set in the whole task
+
+Automating the title-paraphrase signal (flag any non-selected paper whose title words
+are >=75% present in the question) gave 16 hits, mostly false alarms from short
+generic titles. One was real and important.
+
+`ltqa_cbad41e189930190` asks about "the **AI-assisted machine translation evaluation**
+study … for ESA, **ESAAI**, and MQM". We had selected `acl2025_01290`, a
+machine-translation *human parity* paper. The pool contains `naacl2025_00069`,
+**"AI-Assisted Human Evaluation of Machine Translation"**, which *introduces* the
+protocol: "This setup, which we call ESAAI" (p2). The same question had also been
+flagged by the numeric MC triage, so two independent signals pointed at it.
+
+Figure 9 on p13 reports both agreements:
+
+| | ESA | ESAAI | MQM |
+|---|---|---|---|
+| inter-annotator Kendall | 0.254 | 0.359 | 0.116 |
+| **intra**-annotator Kendall | **0.149** | **0.333** | 0.109 |
+
+The question asks for **intra**-annotator, so ESAAI 0.333 and ESA 0.149 — option
+**B**. We answered **C** (0.359 / 0.116), which is *inter*-ESAAI paired with
+*inter*-MQM.
+
+Every one of the four options is built from real numbers inside that single figure:
+
+| option | what its numbers actually are |
+|---|---|
+| A | 0.254 = inter ESA, 0.109 = intra MQM |
+| **B** | **0.333 = intra ESAAI, 0.149 = intra ESA** — correct |
+| C | 0.359 = inter ESAAI, 0.116 = inter MQM |
+| D | 0.281 and 0.189 = the MQM *Pearson* values |
+
+Nothing short of reading the axis labels separates them. This is the sharpest example
+of why numeric attestation is useless as a correctness test on this benchmark, and
+why the earlier attestation-based triage kept returning false positives.
+
+Running total, `test_v29` against v19: **17 of 71 questions**, **7 paper sets**,
+4 multiple-choice answers, and 22 table cells.
