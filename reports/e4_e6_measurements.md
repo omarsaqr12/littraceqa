@@ -114,3 +114,27 @@ Two changes, both required, because either alone is silently undone by the other
 Cell accuracy is 1/9 of the overall score and we sit at 0.0952, so this is a direct
 attack on a component where we are near the floor. Effect size not yet measured — it
 needs a table run, which is folded into E7.
+
+## PDF readability across the test set: 0 of 112 papers unreadable
+
+While auditing a prompt-template cell, `pymupdf.open()` died mid-script on
+`iccv2025_02025` and I briefly concluded that paper was unreadable by our stack.
+**That was wrong.** Probing every selected test paper in an isolated subprocess:
+
+    papers probed: 112, unreadable: 0
+
+`load_text` opens the PDF directly with no cache (`littraceqa/pdf/read.py:175`), so
+an OK result means the text really was extracted. The earlier failure was a local
+resource exhaustion in my own script, which had `PaperPool.load()` (27,487 papers) in
+memory alongside an open document — not a defect in the file. `pdfinfo` reads it
+cleanly and `pdftotext` extracts 57,684 characters.
+
+Recording it because the wrong conclusion was the more interesting one: had it been
+true, every answer sourced from that paper would have been a guess. It is worth
+knowing that the reader is not silently losing papers. The correct way to test this
+is a subprocess per paper, since a crash in-process takes the whole scan with it and
+buffered output disappears — the crash printed nothing until `python -u` was used.
+
+For the record, the paper's own text confirms the cell we had: `iccv2025_02025` p3
+gives `"This is a photo of a [CLASSc]"` with a subscript c, so our `[CLASS_c]`
+transcription stands and was left unchanged.
