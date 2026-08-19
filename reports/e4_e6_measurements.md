@@ -138,3 +138,40 @@ buffered output disappears — the crash printed nothing until `python -u` was u
 For the record, the paper's own text confirms the cell we had: `iccv2025_02025` p3
 gives `"This is a photo of a [CLASSc]"` with a subscript c, so our `[CLASS_c]`
 transcription stands and was left unchanged.
+
+## Where gold puts the page when a value repeats (measured)
+
+Blanket page-shifting is dead, and this is why. Taking every validation gold
+evidence item whose answer value appears on more than one page of the cited
+paper (38 items), and asking where gold's page falls in that list:
+
+| gold's page is | count |
+|---|---|
+| the earliest occurrence | 10 |
+| somewhere in the middle | 22 |
+| the latest occurrence | 6 |
+
+So gold is *not* the first occurrence 28 times out of 38 -- which is why our
+habit of citing the abstract is probably wrong -- but it is not the last either.
+"Prefer the later page" measured +0.013 evidence F1 on validation, below the
+0.02 bar, and this table explains the ceiling: there is no positional rule to
+learn, only a semantic one.
+
+What the measurement is good for is **triage**: an item whose cited page is the
+earliest of several occurrences is worth opening by hand. It is not a rewrite
+rule.
+
+## v39 evidence corrections
+
+| question | was | is |
+|---|---|---|
+| `ltqa_a2c8b9763a7ce26e` | `iccv2025_00049` figure p4 Figure 2 | text_span p4 -- the covariance equations are prose |
+| `ltqa_c0b2f8616b032d4b` | `iccv2025_02644` p4 / `iccv2025_01958` citation p9 | p3 ("three categories of alterations") / citation p2, where RotoGrad's feature rotation is discussed; `[21]` was already the right citation number |
+| `ltqa_1d2f37bc9076dcff` | 2 papers, 3 items | 1 paper, 2 items -- both SCIQ scores are on p15 of the same paper |
+
+Four MC answers re-confirmed against the source while doing this and left
+alone: `ltqa_a2c8b9763a7ce26e` (option C matches both papers' equations exactly),
+`ltqa_c0b2f8616b032d4b` (three categories, RotoGrad feature rotation),
+`ltqa_cf29b3a6608039ea` (Table 14's caption defines the average-min column;
+Table 1's caption states the 46%), `ltqa_69178ae8aa769eda` (VLIPP p4: "phenomena
+in videos into six categories").
