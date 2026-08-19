@@ -410,3 +410,31 @@ still added, since the question names it explicitly and gold sets are 56%+ size 
 This is the seventh and eighth paper-set correction. Emitted set sizes are now
 `{1: 30, 2: 38, 3: 3}`, closer to the 56%-size-two structure derived earlier from
 v14's precision/recall split.
+
+## Seven wrong papers found after v32
+
+All seven were found by asking whether the paper we cite actually contains the
+thing the question names -- an entity, or one of the answer's candidate values --
+rather than by asking a model to re-select.
+
+| question | was | is | proof |
+|---|---|---|---|
+| `ltqa_dada5a958af5068b` | `eccv2024_02070` | `iccv2025_02482` | p2 "BLIP's smaller text encoder/decoder (BERT-base, 110M" |
+| `ltqa_5b08acb319329757` | `naacl2025_01150` | `iccv2025_02101` | Figure 5 p4 holds 16.32 / 23.84 / 32.71 |
+| `ltqa_ab60eb571239314b` | `naacl2025_00237` | `naacl2025_00609` | 00237 is EAC; ERASE is "Language Modeling with Editable External Knowledge" |
+| `ltqa_090478d0ddf8d27f` | `icml2025_01987` | `iccv2025_00745` | "Figure 1. Reward Model Scoring Paradox", FLUX at 4.29% down |
+| `ltqa_d2b9a56db69fe43c` | `neurips2025_04917` | `iccv2025_02125` + `iccv2025_02128` | the paper cited was none of the three the options name |
+| `ltqa_751e3be5540b9fa5` | `naacl2025_00493` | `naacl2025_00513` | Table 1 p4 "Detecting IKE edits ... using top-10 output probabilities", GPT-J F1 82.82 |
+| `ltqa_729fa13078b8135f` | `iccv2025_02460` | `iccv2025_00138` | the only paper in the corpus that names CoX-LMM (p2); TWIST & SCOUT names neither CoX-LMM nor Tong et al. |
+
+Two of the seven needed a PDF that had never been fetched, because the paper was
+never selected in the first place -- so no text-based check could have reached
+it. Searching the 27,487 titles for the question's entity names is what found
+them.
+
+### What did not need changing
+
+`ltqa_98ff929cb222a1b3` still emits one paper for a two-part question. The
+word-colour association half asks for the peak of a population ΔE axis, and no
+title or abstract in the pool matches on colour association, ΔE, or CIELAB.
+Padding the set with a guess costs precision for nothing, so it stays at one.
