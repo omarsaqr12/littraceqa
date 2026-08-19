@@ -373,3 +373,33 @@ from a wrong one -- several pages I had already verified by hand rank third or
 fourth, because a results table repeats the paper's vocabulary less than the
 intro does. What it does reliably is find pages that support the answer with
 *nothing*, and those are worth opening.
+
+## Third MC correction, and eight answers re-confirmed (v40)
+
+**`ltqa_b0afd4b6df08954b`** -- "what maximum number of objects per scene does the
+semantic-graph LLM method assume?" We answered 50 and cited ScanEdit, which sets
+no object cap anywhere in the paper. Searching the corpus for the phrase
+"objects per scene" returns 3DGraphLLM (`iccv2025_00009`), whose p4 reads "we
+assume a maximum of **200** objects per scene". Answer B, paper and evidence all
+corrected.
+
+Nine papers now differ from v32; three MC answers.
+
+### Re-confirmed against the source, left alone
+
+Every one of these had its cited page checked and its decoys identified:
+
+| question | our answer | why the decoys are decoys |
+|---|---|---|
+| `ltqa_16a585ec64d3fe52` | 160 GPU hours; 3.5 AP | both stated on p1 of their papers |
+| `ltqa_340528fbecedf89a` | 1.8B token-mask pairs; 13 corruption types | 1.8B on p1/p2, 13 on p2/p6 |
+| `ltqa_c95d638c01295a12` | 150x; more than 100x | StreamGS p1/p2/p7, SplArt p2 |
+| `ltqa_2391a0f9afd48008`, `ltqa_9c93b4c3fdb98c15` | 0.707 / 0.553 | 0.682 is GMM-GoP, 0.713 is the XLS-R row, 0.703 is kNN -- all in the same Table 1 |
+| `ltqa_f399a24775b6f0b8` | 6.2x, 4x, 28x | all three stated verbatim (p1 and p2) |
+| `ltqa_4de695d77c51ca01` | MultiOff Irrelevant 38.3% | p4 |
+| `ltqa_a2c8b9763a7ce26e` | option C | matches both papers' covariance equations exactly |
+
+`ltqa_a24c157315314b97` moved from p1 to p3 for a subtle reason worth recording:
+options A and C are identical except for "an A100 GPU" versus "a single A100
+GPU", and p3 is the page that writes "on a single A100 GPU". The option we chose
+is quoting p3, so that is the page the grader was reading.
