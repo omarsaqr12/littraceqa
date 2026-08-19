@@ -87,6 +87,12 @@ def main() -> int:
                         help="Read table cells off a rendered page instead of the "
                              "evidence digest (exp/14: cell acc 0.068 -> 0.159). "
                              "Row keys are unchanged.")
+    parser.add_argument("--row-key-extract", action="store_true",
+                        help="Decide table row keys in a dedicated question-only "
+                             "call before filling cells. Row keys are graded by "
+                             "exact string match and 44%% of validation gold keys "
+                             "appear verbatim in the question, but the combined "
+                             "call sees the papers' wording and drifts to it.")
     parser.add_argument("--llm-shortlist", type=int, default=20,
                         help="Candidates shown to the LLM selector. Gold coverage "
                              "saturates at top-30 (0.686 -> 0.703); beyond that the "
@@ -198,6 +204,7 @@ def main() -> int:
         llm_select_samples=args.llm_select_samples,
         llm_select_model=args.llm_select_model,
         visual_table_cells=args.visual_table,
+        extract_row_keys=args.row_key_extract,
         use_expansion=args.expansion,
         max_papers_to_read=args.max_papers,
         mc_samples=args.mc_samples,

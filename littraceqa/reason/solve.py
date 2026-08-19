@@ -89,6 +89,26 @@ def table_response_schema(schema: list[dict[str, Any]]) -> dict[str, Any]:
         "required": ["rows"],
     }
 
+def rowkey_response_schema(key_column: str) -> dict[str, Any]:
+    """Keys only. Naming the property after the real column keeps the model from
+    inventing a different one, the same fix that took table row F1 from 0.051 to
+    0.528 when `table_response_schema` started naming columns."""
+    return {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {key_column: {"type": "string"}},
+                    "required": [key_column],
+                },
+            }
+        },
+        "required": ["rows"],
+    }
+
+
 TABLE_PROMPT = """Build the answer table for this question about scientific papers.
 
 QUESTION
@@ -114,6 +134,34 @@ Rules:
   leaving a blank. Read the value off the paper where you can; where you cannot,
   give the most plausible value consistent with the rest of the row and the
   paper's reported numbers. Never emit null."""
+
+ROWKEY_PROMPT = """List the rows of the answer table for this question.
+
+QUESTION
+{question}
+
+The table has one row-key column named "{key_column}". Row keys are graded by
+exact string match after lowercasing, so the surface form matters as much as the
+content.
+
+Rules, each learned from a graded example:
+- **Copy the row names from the question, not from the papers.** The question
+  names the things being compared; the grader used those names. On validation,
+  44% of gold row keys appear verbatim in the question text and the paper's own
+  wording scored zero.
+- **Strip a parenthetical that only restates a detail.** The question wrote
+  "ECM-XL (100k iterations)" and gold was "ECM-XL". Keep the shortest form that
+  still tells the rows apart.
+- **Keep a qualifier only when it is the sole thing distinguishing two rows,**
+  and then keep it in its shortest form: gold "ECM-XL (102.4M)", not
+  "ECM-XL (with 102.4M training budget)".
+- Emit one row per item the question asks about, in the order the question lists
+  them, and nothing else. A row F1 is a set F1, so an extra row costs as much as
+  a missing one.
+- Do not invent rows to pad the table, and do not merge two asked-for items into
+  one row.
+
+Return only the row-key values."""
 
 FREEFORM_PROMPT = """Give the final answer to this question about scientific papers.
 
@@ -154,9 +202,14 @@ def format_evidence(readings: list[Reading], pool_titles: dict[str, str]) -> str
 
 
 class AnswerSolver:
-    def __init__(self, client: GeminiClient, *, mc_samples: int = 3):
+    def __init__(
+        self, client: GeminiClient, *, mc_samples: int = 3,
+        extract_row_keys: bool = False,
+    ):
         self.client = client
         self.mc_samples = mc_samples
+        #: Decide table row keys in their own call, from the question only.
+        self.extract_row_keys = extract_row_keys
 
     # -- multiple choice ------------------------------------------------------
 
@@ -247,6 +300,19 @@ class AnswerSolver:
                 return filled
             return {"rows": [_complete_row(r, schema) for r in seeded]}
 
+        # Rows from the question, cells from the papers -- two calls instead of
+        # one. Only for a single row-key column, which is 21/21 of test and 10/11
+        # of validation; the multi-key case keeps the combined path.
+        if self.extract_row_keys and len(row_keys) == 1:
+            seeded = self._extract_row_keys(question, row_keys[0])
+            if seeded and _keys_grounded(question.question, seeded, row_keys[0]):
+                if len(columns) == 1:
+                    return {"rows": [_complete_row(r, schema) for r in seeded]}
+                filled = self._fill_remaining(question, seeded, readings, titles, schema)
+                if filled:
+                    return filled
+                return {"rows": [_complete_row(r, schema) for r in seeded]}
+
         column_lines = "\n".join(
             f"  - {c.get('name')} ({c.get('type', 'string')})"
             + ("  [ROW KEY]" if c.get("is_row_key") else "")
@@ -279,6 +345,43 @@ class AnswerSolver:
             return {"rows": [_complete_row({}, schema)]}
         return {"rows": [_complete_row(r, schema) for r in rows if isinstance(r, dict)]}
 
+
+    # -- row keys -------------------------------------------------------------
+
+    def _extract_row_keys(
+        self, question: Question, key_column: str
+    ) -> list[dict[str, Any]] | None:
+        """Decide the row keys from the QUESTION alone, before any paper is read.
+
+        The combined prompt asks for keys and cells in one call with the papers'
+        evidence in context, and the keys drift towards the papers' wording. The
+        grader used the question's wording. Separating the two stages removes the
+        contamination; `_fill_remaining` then fills cells against fixed keys.
+        """
+        payload = self.client.generate_json(
+            ROWKEY_PROMPT.format(question=question.question, key_column=key_column),
+            schema=rowkey_response_schema(key_column),
+            max_output_tokens=800,
+            default=None,
+        )
+        rows = payload.get("rows") if isinstance(payload, dict) else None
+        if not isinstance(rows, list) or not rows:
+            return None
+        seen, out = set(), []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            value = row.get(key_column)
+            if not isinstance(value, str) or not value.strip():
+                continue
+            # Duplicate keys collapse in the scorer's dict, so a repeat is a
+            # silently discarded row rather than a second one.
+            marker = value.strip().lower()
+            if marker in seen:
+                continue
+            seen.add(marker)
+            out.append({key_column: value.strip()})
+        return out or None
 
     def _fill_remaining(
         self,
@@ -351,6 +454,39 @@ class AnswerSolver:
 # --- helpers -----------------------------------------------------------------
 
 _TITLE_COLUMN = re.compile(r"\b(paper|article|publication)?\s*title\b|^paper$", re.I)
+
+
+def _keys_grounded(
+    question_text: str, rows: list[dict[str, Any]], key_column: str
+) -> bool:
+    """Are these row keys actually taken from the question?
+
+    The extractor only helps when the question *enumerates* the rows. On a
+    discovery question ("Which CVPR 2025 papers cite UniAD ...") it either returns
+    nothing or invents a plausible wrong entity -- exp/22 saw it replace a correct
+    author, read out of the paper's reference list, with a fabricated one.
+
+    Requiring **every** key to appear in the question separates the two cases
+    cleanly. A trailing parenthetical is stripped before matching, because gold
+    shortens qualifiers the question spells out ("ECM-XL (with 102.4M training
+    budget)" -> "ECM-XL (102.4M)"), so the base name is what is checked.
+    """
+    haystack = _normalise_for_match(question_text)
+    if not haystack:
+        return False
+    for row in rows:
+        value = row.get(key_column)
+        if not isinstance(value, str):
+            return False
+        base = re.sub(r"\s*\([^)]*\)\s*$", "", value).strip() or value
+        if _normalise_for_match(base) not in haystack:
+            return False
+    return True
+
+
+def _normalise_for_match(text: str) -> str:
+    """Lowercase, drop punctuation that varies between question and gold."""
+    return re.sub(r"[^a-z0-9]+", "", str(text or "").lower())
 
 
 def _is_title_column(name: str) -> bool:

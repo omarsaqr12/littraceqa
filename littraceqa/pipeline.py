@@ -111,6 +111,8 @@ class PipelineConfig:
 
     # -- stage E
     mc_samples: int = 3
+    #: Table row keys from a dedicated question-only call (see solve.py).
+    extract_row_keys: bool = False
 
 
 @dataclass
@@ -185,7 +187,10 @@ class Pipeline:
         # The solver still needs the hosted client for table synthesis. With a
         # local reader and no key, table questions fall back to row keys built
         # from the question and the paper titles.
-        self.solver = AnswerSolver(client, mc_samples=self.config.mc_samples) if client else None
+        self.solver = AnswerSolver(
+            client, mc_samples=self.config.mc_samples,
+            extract_row_keys=self.config.extract_row_keys,
+        ) if client else None
 
     # -- stages A-C: paper selection (local, free) -----------------------------
 
