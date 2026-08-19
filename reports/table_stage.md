@@ -414,3 +414,40 @@ Verified **correct** and left untouched, which is as important as the fixes:
 Running total against the scored v19 (0.5602): **11 questions**, 5 paper sets,
 3 multiple-choice answers, 6 evidence sets and **15 table cells**, every change
 citing a page.
+
+## Continued audit: verified-correct is a result too
+
+| question | outcome | source |
+|---|---|---|
+| RetrieverGuard | **all 8 cells correct** | Table 6 p13, `RetrieverGuard (Stella-400M) …+Fake2` rows |
+| Track-SQL | SESE totals 240.348 / 214.456 **correct** | Table 13 p17 |
+| HateSieve / AceMath | **all 4 cells correct**: 1e-4, 4 epochs, 5e-6, 3e-6 | `naacl2025_00007` p13; `acl2025_00011` p20 §D.5 |
+| GRAB / Matador / HCN-PAI | **1 of 3 wrong**: categories 7 -> **9** | `iccv2025_01050` **Table 2** p4 |
+
+GRAB is a clean instance of the wrong-object failure. Table 2 ("GRAB categories and
+graph properties") lists nine categories — Intercepts & Gradients, Stationary
+Points, Trigonometric, Functions, Counting, Correlation, Area Bounded, Measures of
+Spread, Range & Extrema — and their properties sum to the 23 the question cites. We
+answered 7. Note the adjacent trap: **Table 1** reports `Tasks 5`, and Figure 3's
+legend splits Range & Extrema into two, giving 10. Three different plausible numbers
+sit within a few centimetres of each other, and only Table 2 answers the question
+asked. Our evidence pointed at Table 1, so it was wrong too, and the coarse evidence
+key includes the table id — that mismatch alone would have scored zero.
+
+Matador's 57 material classes and HCN-PAI's four benchmark hypergraph datasets
+(CORA, CITESEER, NTU2012, ModelNet40, `iccv2025_01167` p5) are both correct.
+
+Two evidence pointers re-aimed at the page that actually contains the answer:
+GRAB Table 1 -> Table 2, and HateSieve p4 -> p13.
+
+### Running total, `test_v26` against the scored v19 (0.5602)
+
+| | changed |
+|---|---|
+| questions | **13 of 71** |
+| paper sets | 5 |
+| multiple-choice answers | 3 |
+| evidence sets | 8 |
+| table answers | 8 (18 individual cells) |
+
+Every change cites a page. Nothing is inferred, nothing is submitted yet.
