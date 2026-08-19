@@ -147,3 +147,60 @@ selection or verification. Any further gain has to come from putting gold in the
 list in the first place — which is the one thing that has resisted every method
 tried: BM25, dense, cross-encoder rerank, acronym and nickname indices, and
 title generation.
+
+---
+
+## Doing the work directly beats the API model, and v19 proved it
+
+`test_v19` — row keys authored by hand rather than by a model call — scored
+**0.5602 against v9's 0.5519**, the project's best. Table row F1 rose 0.2738 to
+0.3405 (+1.40 of row F1 across 21 questions) while paper, evidence and
+multiple-choice stayed **numerically identical**, which is what a clean
+single-variable edit looks like.
+
+That result changes the strategy. The remaining stages are worth, by arithmetic on
+v19's components:
+
+| lever | overall | delta |
+|---|---|---|
+| table row + cell -> 0.75 each | 0.6776 | **+0.1174** |
+| evidence -> 0.70 | 0.6356 | +0.0754 |
+| paper -> 0.95 | 0.6105 | +0.0503 |
+| MC -> 0.90 | 0.5736 | +0.0133 |
+| all together | **0.8167** | (rank 1 today is 0.7837) |
+
+### Two questions had the wrong paper entirely
+
+Resolving every named system in all 71 questions against the pool (unique
+title-or-abstract substring match) flagged 13 questions. Eleven were substring
+collisions — `Top-1` matching "Looking Beyond the Top-1", `BLIP` matching
+"X-InstructBLIP", `AP-Attack` matching "…Saliency Map **Attack**s…". Two were real,
+and both are questions built around a system the pool names directly:
+
+| question | we picked | correct | evidence |
+|---|---|---|---|
+| "In the **GenieBlue** study…" | `neurips2025_00639` "Can MLLMs Absorb Math Reasoning…" | `iccv2025_01015` **titled** "GenieBlue: Integrating both Linguistic and Multimodal Capabilities…" | title match |
+| "In the **EpicPRM** work…" | `acl2025_02738` "The Lessons of Developing Process Reward Models" | `acl2025_00183` "An Efficient and Precise Training Data Construction Framework…" | EpicPRM is its method name, in the abstract |
+
+Swapping rather than adding is correct: with gold sets of size 1 or 2, emitting only
+the right paper beats emitting both under either size (1.000 or 0.667, against
+0.667 or 0.500).
+
+Reading the correct papers then fixed three further answers that were confidently
+wrong because they came from the wrong source:
+
+* **GenieBlue, multiple choice.** Table 3, page 3: BlueLM-3B LLM-tasks at 7M+2M
+  scores MATH **30.60**, Qwen2.5-3B **40.18** — option **B**. We answered **A**
+  (38.94 / 61.74), which is the *un-finetuned base LLM* row, i.e. exactly the
+  distractor the question was built to catch.
+* **EpicPRM, table cells.** Page 4 states the study "classified problem difficulty
+  into **11 levels**"; we answered 4. Figure 2 on page 3 plots the ratio against
+  difficulty, leftmost point **0.431** and rightmost **0.541**; we answered 5.1% and
+  43.4%. All three cells were wrong and all three are now read off the source.
+* **Evidence** for both now points at the real locators (`Table 3` p3;
+  `Figure 2` p3 plus the page-4 text span) instead of at pages of the wrong papers.
+
+`test_v20` is v19 with exactly these two questions changed. Expected movement is
+about +0.024 overall: two paper sets, one multiple-choice answer, three table cells
+and three evidence items, every one of them verified against the PDF rather than
+inferred.
