@@ -222,6 +222,26 @@ def main() -> int:
         if len(errors) > 100:
             print(f"- ... {len(errors) - 100} more error(s)")
         return 1
+    # A run whose LLM quota died mid-flight does not raise. `generate_json`
+    # returns None and the table path falls back to one row of nulls, which is a
+    # perfectly well-formed submission that scores zero. test_v17 shipped 9 of 21
+    # tables like that and its trace recorded no error at all. Gold table cells
+    # are never null (0 of 27 graded), so an all-null row is always a dead run.
+    dead = [
+        row.get("query_id")
+        for row in predictions
+        for table_row in (
+            ((row.get("answer") or {}).get("table") or {}).get("rows") or []
+        )
+        if table_row and all(value is None for value in table_row.values())
+    ]
+    if dead:
+        print(f"Submission is well-formed but DEAD: {len(dead)} all-null table row(s)")
+        print("Gold table cells are never null, so these score zero. Likely a quota")
+        print("or rate-limit death mid-run. Do not submit; re-generate.")
+        for query_id in dict.fromkeys(dead):
+            print(f"- {query_id}")
+        return 1
     print(f"Submission is valid: {len(predictions)} predictions")
     return 0
 

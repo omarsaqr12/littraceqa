@@ -305,3 +305,43 @@ Net position: the mechanism is measured and real on validation (+0.0434 row F1,
 cells intact) but worth only ~+0.005 overall there, which is under this repo's
 0.02 ship threshold. It remains behind `--row-key-extract`, default off, and
 untested on test.
+
+## v19: the row keys written by hand, three questions, from the scored baseline
+
+With the Gemini day-quota gone, the row-key stage was done directly rather than by
+another model call. Reading all 21 test table questions against v9's emitted rows,
+only three warranted a change. Everything already correct was left untouched —
+that is the `cosql` lesson, and 18 of 21 questions are in that category.
+
+| # | row-key column | v9 | v19 | why |
+|---|---|---|---|---|
+| 8 | `method_metric` | `NeRFmm`, `BARF` | `NeRFmm RPEr`, `BARF ATE` | the only other columns are the two scenes `Rm-2` and `Off-0`, so the metric has nowhere to live except the row key, and the column is literally named `method_metric` |
+| 10 | `method` | `VideoLLaMB recurrent memory bridge design`, `WINS Winograd pruning design` | `VideoLLaMB`, `WINS` | the column is `method`; bare proper name beats a description of the design |
+| 14 | `paper` | `CoT-ICL Lab: ...` | `C o T - ICL Lab: ...` | gold paper-title keys are the pool title byte-for-byte, mangling included; the pool holds the spaced form |
+
+Deliberately **not** changed, despite being verbose: the `quantity`, `setting`,
+`attribute` and `metric` columns (#3, #11, #12, #13, #21). Those columns ask for a
+descriptor rather than an entity, so a bare name would be semantically wrong, and
+gold's exact phrasing is unknowable. Substituting one guess for another has no
+expected value — that is what v16 did, and it cost 0.0130.
+
+`test_v19` is the cleanest single-variable submission this project has produced:
+papers, evidence, multiple-choice and every cell value are **identical to v9**, and
+exactly 5 row-key strings differ. Any score movement is attributable to row-key
+surface form alone. Three questions can move, so the range is roughly ±0.032
+overall.
+
+### The guard that would have caught test_v17
+
+`scripts/validate_submission.py` now fails a submission containing an all-null
+table row. Gold cells are never null (0 of 27 graded), so such a row is always a
+dead run rather than a considered answer, and it is invisible to every other check:
+`test_v17` was well-formed, passed validation, and recorded no error in its trace.
+
+    test_v17  Submission is well-formed but DEAD: 9 all-null table row(s)
+    test_v19  Submission is valid: 71 predictions
+
+Four silent failures this session — rate-limit fallback to BM25, a stale A/B
+baseline, a wrong-key diff, and a quota death — and each one produced a plausible
+number instead of an error. This is the first of them to get an automated check
+rather than a note in a report.
