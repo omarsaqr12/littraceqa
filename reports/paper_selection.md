@@ -382,3 +382,31 @@ why the earlier attestation-based triage kept returning false positives.
 
 Running total, `test_v29` against v19: **17 of 71 questions**, **7 paper sets**,
 4 multiple-choice answers, and 22 table cells.
+
+## Two-part questions with only one selected paper
+
+A cheap structural check: questions whose wording names two studies ("in X, and in
+the Y") but where only one paper was selected. Four turned up, and two named their
+second paper outright:
+
+| question | had | added | why |
+|---|---|---|---|
+| dynamic uncertainty ranking + **Balanced Preference Optimization** | `naacl2025_00327` | `naacl2025_00157` | titled "**BPO**: Towards **Balanced Preference Optimization**…" |
+| **museum-exhibits** VL paper + TruthPrInt | `iccv2025_02453` | `eccv2024_02070` | titled "Taming CLIP … Visual Understanding of **Museum Exhibits**" |
+
+For the BPO question, reading both papers **confirmed our answer C on both halves** and
+showed only the paper set was incomplete:
+
+* `naacl2025_00327` p2: "we update the threshold σ when the LLM experiences a
+  **negative prediction change**" — option C's first half.
+* `naacl2025_00157` p4: "the parameter update process, based on the **Adam** optimizer" —
+  option C's second half (option A says AdamW).
+
+For the museum question the MC options turn on BLIP's text encoder being BERT-base
+(110M) versus BERT-large or DistilBERT, and **no parameter count appears anywhere in
+`eccv2024_02070`**, so the answer was left untouched rather than guessed. The paper was
+still added, since the question names it explicitly and gold sets are 56%+ size two.
+
+This is the seventh and eighth paper-set correction. Emitted set sizes are now
+`{1: 30, 2: 38, 3: 3}`, closer to the 56%-size-two structure derived earlier from
+v14's precision/recall split.
