@@ -245,3 +245,50 @@ around, and they are only separable by reading the source.
 `test_v23` differs from the scored v19 on **8 questions**: 4 paper sets, 3
 multiple-choice answers, 6 evidence sets and 7 table cells, every one verified
 against a PDF page that is cited in the record above.
+
+## A third triage on multiple choice, and the distractor pattern it exposed
+
+Same idea again: for each MC question, check which options' decimal numbers are
+literally attested in the selected papers. **The first version of this triage was
+wrong** — it stripped spaces before matching, so `86.47` matched inside `186.472`
+and it reported four suspects. Matching each number as a standalone token against
+raw page text leaves **two**, and both turned out to be *our answer being right*:
+
+| question | flagged because | truth |
+|---|---|---|
+| ERNet | our `0.11` appears nowhere | **we were right.** Table p6 gives C-NICP on D-FAUST ATE3D **0.108**, which is "near 0.11" on the Figure 1b plot, and p5 states `M = 6` twice. The value was never going to appear literally — it has to be read off a plot |
+| ICD / FAST | option C's numbers are fully attested, ours only half | **we were right.** MC3 = **41.25** (Table 1 p4 — C's 46.32 is the *MC1* column); race RS = **89.58** (Table 2 p6 — C's 100.0 is *vanilla BERT's* RS) |
+
+**The distractor pattern, now seen five times.** Every wrong or near-wrong MC answer
+involved a number that is genuinely printed in the paper but answers a different
+question: GenieBlue's un-finetuned baseline row instead of the fine-tuned one,
+FlipEval (the paper's own contribution) instead of the CircularEval it cites, MC1
+instead of MC3, vanilla BERT's RS instead of FAST's. These are not hallucinations.
+They are the distractors the benchmark was built from, and numeric attestation
+cannot separate them — only reading the surrounding row and column headers can.
+This is the clearest reason a model that skims loses this task.
+
+### A fifth wrong paper, from a name collision
+
+The ICD/FAST question needed the **FAST debiasing** method. We had selected
+`naacl2025_01019`, "Synonym-unaware **Fast** Adversarial Training" — a different
+FAST entirely. The right paper is `naacl2025_00527`, which introduces
+"**Fairness-Stamp (FAST)**" *and defines Retention Score (RS)*, the very metric the
+question asks for. Acronym collisions are invisible to a retriever scoring
+title-abstract similarity, because both papers genuinely match "FAST".
+
+### Final state of the hand-audited file
+
+`test_v24` against the scored v19 (0.5602):
+
+| | changed |
+|---|---|
+| paper sets | **5** |
+| multiple-choice answers | 3 |
+| evidence sets | 6 (118 -> 120 items) |
+| table cells | 7 |
+| questions touched | 9 of 71 |
+
+One correction to my own earlier edit: I had narrowed the SCIQ question's evidence
+from three items to one, which drops recall for no reason. Both the Mistral (Table
+10) and LLaMa (Table 11) tables sit on p15 and both are needed. Restored.
