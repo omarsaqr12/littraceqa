@@ -143,6 +143,7 @@ class Pipeline:
         fetcher: PDFFetcher | None = None,
         dense: DenseRetriever | None = None,
         reader: Any = None,
+        select_client: Any = None,
     ):
         self.pool = pool
         self.config = config or PipelineConfig()
@@ -171,10 +172,10 @@ class Pipeline:
         # Any object with PaperReader's `read()` signature: the hosted reader,
         # or `reason.local_llm.LocalReader` running on the GPU with no quota.
         self.llm_selector = LLMPaperSelector(
-            pool, client, shortlist=self.config.llm_shortlist,
+            pool, select_client if select_client is not None else client, shortlist=self.config.llm_shortlist,
             samples=self.config.llm_select_samples,
             model=self.config.llm_select_model
-        ) if (self.config.use_llm_selector and client is not None) else None
+        ) if (self.config.use_llm_selector and (select_client or client) is not None) else None
         self.visual_table = VisualTableSolver(
             client, self.fetcher
         ) if (self.config.visual_table_cells and client is not None) else None

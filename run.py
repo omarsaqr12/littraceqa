@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 import sys
 import time
@@ -90,6 +91,13 @@ def main() -> int:
                         help="Candidates shown to the LLM selector. Gold coverage "
                              "saturates at top-30 (0.686 -> 0.703); beyond that the "
                              "limit is candidate generation, not selection.")
+    parser.add_argument("--solver-on-select-endpoint", action="store_true",
+                        help="Run answer synthesis on the selector endpoint too, so a "
+                             "run has no Gemini dependency at all. Gemini quota dying "
+                             "mid-run silently emptied a whole validation split.")
+    parser.add_argument("--select-base-url", default=None,
+                        help="OpenAI-compatible endpoint for the selector")
+    parser.add_argument("--select-api-key-env", default=None)
     parser.add_argument("--llm-select-model", default=None,
                         help="Model for the selector step only (~71 calls/run).")
     parser.add_argument("--llm-select-samples", type=int, default=1,
@@ -120,6 +128,10 @@ def main() -> int:
                         help="OpenAI-compatible endpoint for --reader local "
                              "(e.g. http://127.0.0.1:8080 for llama-server). "
                              "Required to use a GGUF model.")
+    parser.add_argument("--local-rpm", type=int, default=0, dest="local_rpm",
+                        help="Requests/minute cap for the reader endpoint")
+    parser.add_argument("--local-api-key-env", default=None,
+                        help="Env var holding the bearer token for --local-base-url")
     parser.add_argument("--local-ctx", type=int, default=None,
                         help="Context window of the served model, so the prompt "
                              "is sized to fit instead of being front-truncated")
@@ -157,7 +169,10 @@ def main() -> int:
         reader = LocalReader(args.local_model or DEFAULT_MODEL,
                              samples=args.local_samples,
                              base_url=args.local_base_url,
-                             context_tokens=args.local_ctx)
+                             api_key=(os.environ.get(args.local_api_key_env)
+                                      if args.local_api_key_env else None),
+                             context_tokens=args.local_ctx,
+                             rpm=args.local_rpm)
         print(f"loading local reader {reader.model_name} ...", flush=True)
         reader.load()  # eagerly, outside the per-question watchdog
         # Still build a client when a key exists: the table solver needs one,
@@ -197,8 +212,19 @@ def main() -> int:
     print(f"CONFIG: reader={args.reader} models={args.models} rpm={args.rpm} "
           f"max_papers={args.max_papers} mc_samples={args.mc_samples}", flush=True)
     print("building indices ...", flush=True)
+    select_client = None
+    if args.select_base_url:
+        from littraceqa.reason.local_client import LocalChatClient
+        select_client = LocalChatClient(
+            args.select_base_url, model=args.llm_select_model or "gpt-oss-120b",
+            api_key=(os.environ.get(args.select_api_key_env)
+                     if args.select_api_key_env else None), rpm=args.local_rpm)
+        print(f"CONFIG: selector -> {args.select_base_url} {select_client.model}", flush=True)
+    if args.solver_on_select_endpoint and select_client is not None:
+        client = select_client
+        print("CONFIG: answer synthesis -> selector endpoint (no Gemini)", flush=True)
     pipeline = Pipeline(pool, config=config, client=client, fetcher=PDFFetcher(),
-                        reader=reader)
+                        reader=reader, select_client=select_client)
 
     out_path = Path(args.out or f"preds/{args.split}.jsonl")
     partial_path = out_path.with_suffix(".partial.jsonl")

@@ -40,7 +40,7 @@ from ..corpus import Paper, Question
 from ..pdf.objects import EvidenceCandidate, format_candidates
 from ..pdf.read import PaperText, load_text
 from ..textnorm import clean, tokens
-from .client import parse_json
+from .client import RateLimiter, parse_json
 from .localize import Reading, _clean_label
 
 #: Instruct-tuned, fits an RTX 3090 in fp16 with room for the retrieval models,
@@ -177,17 +177,23 @@ class LocalReader:
         *,
         device: str = "cuda",
         max_new_tokens: int = 512,
+        # gpt-oss-120b spends reasoning_tokens before the JSON body; 512 truncated
+        # the answer on q_001 and produced 'no parseable JSON'.
+        hosted_max_new_tokens: int = 2048,
         pages_per_paper: int = 6,
         chars_per_page: int = 3500,
         samples: int = 1,
         temperature: float = 0.7,
         base_url: str | None = None,
+        api_key: str | None = None,
         context_tokens: int | None = None,
         timeout: float = 300.0,
+        rpm: int = 0,
     ):
         self.model_name = model_name
         self.device = device
         self.max_new_tokens = max_new_tokens
+        self.hosted_max_new_tokens = hosted_max_new_tokens
         self.pages_per_paper = pages_per_paper
         self.chars_per_page = chars_per_page
         self.samples = samples
@@ -198,11 +204,17 @@ class LocalReader:
         #: on this box are a 0.5B instruct, a 3B *base* (no chat tuning) and a
         #: 2B VL, none of which can be trusted to emit schema-shaped JSON.
         self.base_url = base_url.rstrip("/") if base_url else None
+        #: Bearer token for hosted OpenAI-compatible providers (Cerebras, Groq).
+        self.api_key = api_key
         #: Prompt budget. llama-server here runs --ctx-size 4096, and the
         #: defaults above build a ~9k-token prompt, so it must be trimmed or the
         #: server silently truncates the front -- taking the pages with it.
         self.context_tokens = context_tokens
         self.timeout = timeout
+        #: Hosted providers cap requests per minute even on paid tiers -- Cerebras
+        #: returns 429 request_quota_exceeded. Unlimited firing produced 51 errors
+        #: in 10 questions.
+        self.limiter = RateLimiter(rpm)
         self._model = None
         self._tokenizer = None
         self._session = None
@@ -223,6 +235,8 @@ class LocalReader:
             import requests
 
             self._session = requests.Session()
+            if self.api_key:
+                self._session.headers["Authorization"] = f"Bearer {self.api_key}"
             response = self._session.get(f"{self.base_url}/v1/models", timeout=15)
             response.raise_for_status()
             return
@@ -260,18 +274,24 @@ class LocalReader:
         payload = {
             "model": self.model_name,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": self.max_new_tokens,
+            "max_tokens": (self.hosted_max_new_tokens if self.api_key
+                           else self.max_new_tokens),
             "temperature": self.temperature if sample else 0.0,
-            # Qwen3 thinks by default under --jinja; the reasoning block would
-            # consume max_tokens before any JSON is emitted.
-            "chat_template_kwargs": {"enable_thinking": False},
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {"name": "reading", "schema": READ_SCHEMA},
             },
         }
+        if self.api_key is None:
+            # llama.cpp extension: Qwen3 thinks by default under --jinja and the
+            # reasoning block would consume max_tokens before any JSON appears.
+            # Hosted providers reject unknown fields -- Cerebras returns
+            # 400 "property 'chat_template_kwargs' is unsupported" -- and that
+            # 400 silently emptied every reading in a whole validation run.
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
         if sample:
             payload["top_p"] = 0.9
+        self.limiter.acquire()
         response = self._session.post(
             f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout
         )

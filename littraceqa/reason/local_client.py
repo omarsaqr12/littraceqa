@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .client import Usage, parse_json
+from .client import RateLimiter, Usage, parse_json
 
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "cache" / "local_llm"
 
@@ -41,6 +41,7 @@ class LocalChatClient:
         timeout: float = 300.0,
         temperature: float = 0.0,
         max_retries: int = 3,
+        rpm: int = 0,
         cache_dir: Path = CACHE_DIR,
     ):
         self.base_url = base_url.rstrip("/")
@@ -51,6 +52,7 @@ class LocalChatClient:
         self.timeout = timeout
         self.temperature = temperature
         self.max_retries = max_retries
+        self.limiter = RateLimiter(rpm)
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.usage = Usage()
@@ -126,6 +128,7 @@ class LocalChatClient:
 
         last: Exception | None = None
         for attempt in range(self.max_retries):
+            self.limiter.acquire()
             try:
                 response = self.session.post(
                     f"{self.base_url}/v1/chat/completions",
