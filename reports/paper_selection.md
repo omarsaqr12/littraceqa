@@ -292,3 +292,53 @@ title-abstract similarity, because both papers genuinely match "FAST".
 One correction to my own earlier edit: I had narrowed the SCIQ question's evidence
 from three items to one, which drops recall for no reason. Both the Mistral (Table
 10) and LLaMa (Table 11) tables sit on p15 and both are needed. Restored.
+
+## v26 scored 0.6166, and a sixth wrong paper
+
+`test_v26` scored **0.6166** against v19's 0.5602, **+0.0564**. Every component the
+audit touched moved, and row F1 did not — exactly as expected, since v20-v26 changed
+cells, papers, answers and evidence but no row keys:
+
+| component | v19 | v26 |
+|---|---|---|
+| paper F1 | 0.7991 | **0.8554** |
+| evidence F1 | 0.4737 | **0.5347** |
+| MC accuracy | 0.780 | **0.840** |
+| table cell accuracy | 0.0952 | **0.1984** |
+| table row F1 | 0.3405 | 0.3405 |
+| **overall** | 0.5519 | **0.6166** |
+
+**A sixth wrong paper**, found by reading the question's own words rather than by any
+triage. The question asks about "the FlowChef steering paper and the
+**improved-diffusion-noise-schedule** paper". We had `iclr2025_02712`, "Rectified
+Diffusion: Straightness Is Not Your Need in Rectified Flow". The pool contains
+`iccv2025_01201`, titled **"Improved Noise Schedule for Diffusion Training"**. Both
+are rectified-flow-adjacent, which is why similarity retrieval cannot separate them;
+only the phrase "noise schedule" does.
+
+Its bibliography (p10) carries the same two titles as FlowChef's, `[31]` Lipman "Flow
+matching for generative modeling" and `[32]` Liu "Flow straight and fast: …", so the
+**cells were already right and only the paper was wrong** — the opposite of the usual
+failure, and a reminder that a correct-looking answer does not validate its source.
+
+## Two evidence hypotheses tested and killed
+
+Evidence precision is 0.561, so about half our locators are wrong. Two cheap
+systematic fixes were proposed and both measured worthless before being applied:
+
+1. **Retype `text_span` to `table`.** Our test mix is 52% `text_span` against
+   validation gold's 36%, which looked like a systematic bias. On validation, of 44
+   wrong evidence items only **2** would match if the type alone were corrected, and
+   **1** if only the object id were. **41 of 44 are wrong at the page level.**
+2. **Retype items sitting on a page whose only object is one labelled table.**
+   **Zero** of our test `text_span` items qualify.
+
+The MC locator check was also negative in the useful direction: for all 14 MC
+questions whose chosen option carries decimals, the page we cite does contain those
+numbers. So evidence is not failing on obviously-locatable numbers — it fails on
+questions where gold cites a different page than the one where the value happens to
+be printed, and only per-question reading fixes that.
+
+`test_v28` adds the sixth paper fix, the `MDBPE` row key (the paper names itself that
+in Figure 1 and its repo URL), and the MedVLP/Trokens cell corrections. 121 evidence
+items.
