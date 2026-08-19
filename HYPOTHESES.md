@@ -28,6 +28,19 @@ Component weights: paper 1/3, evidence 1/3, MC 1/9, table row F1 1/9, table cell
 
 ## Still open
 
+## H18 · Test gold set size is 1 or 2, and one submission resolves it
+
+From v9's scored paper F1 (0.7991) and its emitted size distribution
+`{1: 32, 2: 36, 3: 3}`, gold sets of size 3 or 4 are arithmetically impossible.
+The two survivors demand opposite policies: trimming every set to one paper scores
+~0.917 if gold is size 1 and is hard-capped at 0.6667 if gold is size 2. No local
+signal separates them — the singular/plural cue is uninformative (singular
+questions average 2.68 gold papers). **Test:** `preds/test_v14.jsonl` is v9 with
+paper sets trimmed to one and evidence/answers byte-identical, so its score is a
+pure readout of set-size policy. A jump to ~0.58 overall means size 1; a drop to
+~0.50 means size 2. Either way the ambiguity closes, and the board keeps the best
+per team so standing cannot fall.
+
 ## H16 · A shared rate limiter across clients
 
 The reader and the selector hold independent `RateLimiter` instances against one
