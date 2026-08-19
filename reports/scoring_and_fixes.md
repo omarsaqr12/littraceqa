@@ -166,3 +166,44 @@ paper with probability `p` of being gold gives `E[F1] = 0.5 + 0.5p`. That beats
 .venv/bin/python run.py --split validation --mc-samples 1 --out preds/val_full.jsonl
 .venv/bin/python scripts/validate_submission.py --input data/test.jsonl --pred preds/test_v3.jsonl
 ```
+
+## Object-id verification (v36)
+
+`coarse_evidence_key` puts the visible object id in the key, so a right page with
+a wrong "Table 3" scores zero. Captions in this corpus are regular enough that a
+regex over page text checks every id independently.
+
+**48 of 49 confirmed on the page we claim.** The exceptions:
+
+* `naacl2025_00527`: the Race retention-score column lives in **Table 1** on p6
+  ("Debiasing results on BERT"); Table 2, whose caption sits on p7, is the GLUE
+  table. Corrected.
+* `acl2025_01350` "Table I8" -- the caption is genuinely on p24; my regex
+  requires a digit right after "Table" and refused the letter. Detector limit,
+  not a bad citation.
+
+## Three MC answers re-confirmed, not changed
+
+An option-scoring pass (numbers matched as standalone tokens, after the earlier
+version found `86.47` inside `186.472`) flagged three questions. All three were
+already correct, and in each case the higher-scoring decoy is a real number from
+the very same table:
+
+| question | our answer | the decoy, and what it actually is |
+|---|---|---|
+| `ltqa_22ff7b719c5625d4` | MC3 = 41.25 | 43.01 is **MC1** of the 1.3B-Finetuned row |
+| `ltqa_98ff929cb222a1b3` | MAE = 0.668 | 0.906 is the **audio-only** column; the question asks multimodal |
+| `ltqa_f6ae14ff5b8d177b` | 94.4 | 94.5 is cross-check **enabled**; the question says disabled |
+
+This is the same pattern as every earlier triage: the wrong answers are all
+printed in the cited paper, one row or one column away. It is why value-presence
+tests cannot settle these and reading the header can.
+
+## Hedging two locators beats guessing one
+
+Where a value provably appears in two places and nothing distinguishes which the
+grader keyed, emitting both is better arithmetic than picking one. Against a
+single gold item, two predictions with one hit score F1 2/3; a coin flip between
+them averages 1/2. Applied twice, both times after confirming both locations
+hold the value: `ltqa_dc59b0be539a1b22` (prose and Figure 6, same page) and
+`ltqa_f6ae14ff5b8d177b` (Figure 1 p1 and Table 1 p6).
