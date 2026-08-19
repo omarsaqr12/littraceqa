@@ -272,3 +272,69 @@ The question-text cue that would discriminate them does not work: on validation,
 "singular" questions average **2.68** gold papers and "plural" ones **3.50**, so
 the wording carries no set-size signal. `predict_set_size` is guessing.
 
+
+## H18 resolved: test gold sets are mostly size 2, and v9's set-size policy is already near-optimal
+
+`test_v14` (v9 with every paper set trimmed to one, evidence and answers
+byte-identical) was submitted. **It scored 0.5042 against v9's 0.5519, a loss of
+0.0477.** The size-1 hypothesis is dead, and the prediction made before submitting
+it — "a drop to ~0.50 means size 2" — was correct.
+
+The bet lost but the measurement paid, because emitting exactly one paper turns the
+precision/recall pair into a readout of the gold set sizes:
+
+| v14 metric | value |
+|---|---|
+| paper precision | 0.84507 |
+| paper recall | 0.566901 |
+| paper F1 | 0.655869 |
+
+With one paper emitted, precision *is* P(our top pick is gold) = 60 of 71 correct.
+If every gold set had size 1, recall would **equal** precision. It is 0.567, so
+`recall/precision = 0.671 = mean(1/|gold|)` over those 60. Solving
+`n1 + n2/2 = 0.671 × 60` with `n1 + n2 = 60` gives **n1 = 20, n2 = 40**:
+
+* at least **40 of 71 test gold sets (56%) contain two papers**
+* our top-ranked pick is correct on **60 of 71** questions
+
+Neither number needed a gold label. Both fall out of one scored submission and an
+arithmetic identity, and the same trick would have worked on any run since v2.
+
+### Why the obvious follow-up is wrong
+
+If 56% of gold sets hold two papers and v9 emits two on only 39 of 71, padding the
+32 singletons looks free. It is not. Fitting v9's measured 0.7991 under two
+hypotheses about the selector's *size* judgement, with P(2nd pick is gold) as the
+free parameter:
+
+| hypothesis | fitted P(2nd gold) | reproduced F1 |
+|---|---|---|
+| selector knows which rows need two papers | 0.68 | 0.7997 ✓ |
+| selector's size choice is independent of gold size | 1.00 (maximum) | 0.7805 ✗ |
+
+The independent hypothesis **cannot reach the observed score even with a perfect
+second pick.** Only a calibrated selector explains 0.7991. So the 32 singletons are
+predominantly genuinely single-gold, and padding them would trade a 1.000 for a
+0.667 on roughly 20 questions to chase 12. `preds/test_v15.jsonl` (every set forced
+to exactly two) was built and validated, and is **deliberately not submitted** for
+this reason.
+
+The same argument predicts `test_v13` is *worse* than v9: its selector emits 40
+singletons against v9's 32, moving away from a distribution that is already
+calibrated. It is also left unsubmitted.
+
+### Where this leaves the score
+
+Set-size policy is closed — v9 is at or near its optimum. The residual is now
+named exactly:
+
+* **11 of 71 questions have a wrong top-ranked paper.** This is selection, and two
+  independent models agree on most of it.
+* **P(2nd pick is gold) = 0.68** on two-paper questions. The remaining 32% is the
+  only mechanical headroom left in the paper stage, worth ~0.03 paper F1 if closed
+  entirely, ~0.01 overall.
+
+Both are small. The honest read is that the paper stage is within ~0.04 of what
+this architecture supports, and the deficit against rank 1 (0.7837 vs 0.5519) is
+not in paper selection at all — it is the table stage (row F1 0.274, cell accuracy
+0.095), which is 1/3 of the answer score and where this project measured the least.

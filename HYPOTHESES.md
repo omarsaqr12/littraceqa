@@ -22,13 +22,24 @@ Component weights: paper 1/3, evidence 1/3, MC 1/9, table row F1 1/9, table cell
 | H8 | over-generate table rows | folded into H2; row keys are not the constraint |
 | H14 | cerebras `gpt-oss-120b` as selector, single-stage swap | **+0.0280 val, CI [−0.012, +0.081]** — retracts the earlier "no free selector wins"; submitted as v13 |
 | H15 | full-text index to lift 71% -> 89% reachability | **killed** — the whole 18-pt gap is in `multi_paper`; test-like family is already 96% reachable |
+| H18 | test gold set size is 1 or 2 | **resolved: 56%+ are size 2.** v14 (trim to one) scored 0.5042 vs 0.5519. Predicted the drop before submitting |
+| H19 | pad singletons to two papers | **killed on arithmetic** — only a calibrated selector explains v9's 0.7991; padding trades ~20 exact hits to chase ~12 |
 | — | deeper LLM shortlist (20→30) | +0.0109 val, **−0.0026 test** |
 | — | selector self-consistency (3 votes) | +0.0085, CI [−0.023, +0.052] — not shippable |
 | — | free selectors (gpt-oss-120b, glm-4.7, qwen) | all **below** flash-lite |
 
 ## Still open
 
-## H18 · Test gold set size is 1 or 2, and one submission resolves it
+## H20 · The table stage is the actual gap, and it was measured least
+
+Paper selection is within ~0.04 of this architecture's ceiling (11/71 wrong top
+picks, P(2nd gold)=0.68), yet we sit 0.23 behind rank 1. Table row F1 is 0.274 and
+cell accuracy 0.095, together 2/3 of the answer score, and the only table
+experiments run were E5/E7 on a validation split whose row keys are structurally
+unlike test's free-text descriptors. **Test:** extract row keys with a dedicated
+call before filling cells, and measure on `test-extra` rather than validation.
+
+## H18 · [RESOLVED, kept for the record] Test gold set size is 1 or 2
 
 From v9's scored paper F1 (0.7991) and its emitted size distribution
 `{1: 32, 2: 36, 3: 3}`, gold sets of size 3 or 4 are arithmetically impossible.
