@@ -345,3 +345,41 @@ Four silent failures this session — rate-limit fallback to BM25, a stale A/B
 baseline, a wrong-key diff, and a quota death — and each one produced a plausible
 number instead of an error. This is the first of them to get an automated check
 rather than a note in a report.
+
+## Reading the papers by hand: v20 through v22
+
+With the model quota gone, the table cells were verified directly against the
+PDFs. Triage first: grep every emitted cell value against the selected papers'
+extracted text, since a value that appears nowhere in the paper was invented.
+**9 of 21 table questions had at least one.** Filtering out descriptor columns
+(which we legitimately paraphrase) and LaTeX rendering artefacts left six real
+defects, all now corrected and each cited to a page.
+
+| question | defect | corrected to | source |
+|---|---|---|---|
+| GenieBlue (MC) | answered the *un-finetuned base LLM* row, the intended distractor | option **B** (30.60 / 40.18) | `iccv2025_01015` Table 3 p3 |
+| EpicPRM | wrong paper, so all three cells wrong (5.1%, 43.4%, 4) | **0.431, 0.541, 11** | `acl2025_00183` Figure 2 p3, text p4 |
+| FocalPETR/StreamPETR | duplicate row repeated StreamPETR 1.19x twice | first row is **FocalPETR 1.18x** | `iccv2025_00046` p2 |
+| DiTFastAttnV2 | duplicate row repeated the 1.5x speedup twice | first row is **68% attention-FLOPs reduction** | `iccv2025_00613` p1 |
+| LiveBeauty | `Not reported`, which is never right — gold cells are never null | **200 sessions with 50 images per session** | `iccv2025_00902` p3 |
+| LiveBeauty | `10,000`, but the row key asks for image *and* annotation counts | **10,000 images / 200,000 annotations** | `iccv2025_00902` p1-p2 |
+| SCIQ scores | numbers right, format wrong: LaTeX `89.97\pm_{0.97}` | **`89.97±0.97`** | `naacl2025_00811` Table 10 p15 |
+
+**Duplicate rows are worse than they look.** With a single row-key column, repeated
+keys collapse in the scorer's dict, so a duplicated row is not merely wasted — it
+silently discards the second value the question asked for. Both duplicates here
+were concealing a real number.
+
+**The `±` fix is grounded, not a guess.** Validation gold formats uncertainty as
+`32.7±0.5`, no spaces, so the rendered form is what the grader used and LaTeX
+source can never match it.
+
+Verified correct and deliberately left alone: DisCo 75% less tokens (p2), DLFR-Gen
+up to 3x (p1), RTDETRv2 ~114s (p5), LiveBeauty year 2024 and 20 annotators (Table
+1 p2), and every `quantity`/`setting`/`metric` descriptor row key. Also checked:
+**zero** number-typed cells fail `normalize_number`, so no cell is losing to a
+type mismatch.
+
+`preds/` and `logs/` are gitignored (generated outputs; the dataset is CC BY-NC and
+not vendored), so these reports are the record. `test_v22` differs from the scored
+v19 on six questions, every one PDF-verified.
