@@ -197,42 +197,78 @@ The entire 18-point gap lives in `multi_paper`, which is 53% of validation and
 reaches 96% of gold papers and a full-text index would move at most one question
 in twenty-four. The lever was real and pointed at the wrong split.
 
-### …and it does not transfer, because selectors are saturated on the test regime
+### CORRECTION: the "does not transfer" section below was computed with the wrong key
 
-`test_v13` ran the config above on the test split. The Cerebras selector genuinely
-executed — the client cache grew from 241 to 300 entries, 59 fresh calls plus 12
-replayed — and it chose **the same papers as `gemini-flash-lite` on all 71 of 71
-questions.**
+The section that followed here claimed the Cerebras selector chose identical
+papers on **0 of 71** test questions, and concluded that the validation gain
+transfers as exactly zero. **That was wrong.** The comparison read
+`record["paper_ids"]`, a key these prediction files do not contain — the evaluator
+reads papers from `gold_papers`. Both sides of the diff were therefore `None`, and
+`None == None` produced a perfect-agreement result that was really a measurement of
+nothing.
 
-| comparison | paper_ids differ | evidence differs |
+Corrected:
+
+| comparison | papers differ | evidence differs |
 |---|---|---|
-| v9 (gemini selector) vs v13 (cerebras selector) | **0/71** | 29/71 |
+| v9 (gemini selector) vs v13 (cerebras selector) | **26/71** | 29/71 |
 
-So v13's paper F1 is *identically* v9's 0.7991, and the +0.0198 measured on
-validation transfers as exactly zero. The 29 evidence differences are fresh reader
-calls, i.e. run-to-run noise of the kind already quantified at ±0.011.
+Emitted set sizes also differ: v9 is `{1: 32, 2: 36, 3: 3}`, v13 is
+`{1: 40, 2: 28, 3: 3}` — the Cerebras selector hedges less. So v13 is a real
+change on the test split, not a re-draw of v9, and the selector-saturation story
+built on the 0/71 figure is withdrawn along with it.
 
-**v13 is therefore not an improvement. It is a re-draw of v9.** Submitting it is
-variance harvesting — a free lottery ticket, because the board keeps the best per
-team — and it should not be described as anything else.
+The claim survives only in weakened form: selector agreement does rise with how
+identifiable the paper is (48% on validation cluster questions, 88% on
+named-paper), but the test figure that made it look absolute was an artefact.
 
-Why the transfer fails is the useful part. Selector agreement tracks how
-identifiable the paper is:
+**Third instance of the same class of bug this session.** A silent wrong-key read,
+like a silent rate-limit fallback, returns a plausible number rather than an
+error. Both times the number was clean enough to publish and both times it was
+measuring nothing. Any diff between two record sets must now assert that the key
+it reads is present and non-empty on both sides.
 
-| split / family | selector agreement |
-|---|---|
-| validation, `multi_paper` (cluster) | 15/29 changed → 48% agreement |
-| validation, `hidden_source_single_paper` | 3/26 changed → 88% agreement |
-| **test** | **0/71 changed → 100% agreement** |
+## Where the remaining test headroom actually is
 
-When the question names its paper, every competent selector converges on the same
-shortlist entry, and swapping models cannot help. This is the same boundary the
-full-text lever ran into one section above, reached from the other side: **both of
-the two largest remaining levers are levers on `multi_paper`, and `multi_paper` is
-not in the test set.**
+Retrieval is not the constraint on the test-like regime. Rank of the gold paper in
+the candidate list, by family (`exp/21`, no API calls):
 
-It also reframes the standing 0.20 test paper-F1 gap. That gap is *not* selector
-quality — two independent models agree unanimously and both leave it. It is
-candidate recall: the gold paper is not in the top-20 shortlist for the selector
-to find. Shortlist construction, not selection, is where the remaining test
-headroom is, and no experiment in this repo has attacked it directly.
+| family | R@1 | R@20 | R@200 | unreachable |
+|---|---|---|---|---|
+| `hidden_source_single_paper` (test-like) | 0.846 | **0.962** | 0.962 | 1/26 |
+| `multi_paper` (cluster) | 0.100 | 0.533 | 0.658 | 41/120 |
+
+On the test-like family recall is **flat from rank 20 to rank 200**: not one gold
+paper sits in ranks 21-200. Widening `llm_shortlist` cannot help, which is
+consistent with v11 (shortlist 30) scoring 0.5493 against v9's 0.5519. The
+`multi_paper` curve is the one that keeps climbing, and that family is not in the
+test set.
+
+So the test constraint is **set size**, not retrieval and not selection. Two
+independent bounds pin it down. Given v9's emitted size distribution
+`{1: 32, 2: 36, 3: 3}`, the best achievable paper F1 if every test gold set had
+size *g* is:
+
+| g | ceiling | verdict against observed 0.7991 |
+|---|---|---|
+| 1 | 0.8099 | possible, implies 98.7% contains-gold |
+| 2 | 0.8413 | possible, implies 95.0% of ceiling |
+| 3 | 0.6732 | **impossible** |
+| 4 | 0.5545 | **impossible** |
+
+Test gold sets are size 1 or 2. That single fact was available from a scored
+submission and an arithmetic identity, with no gold labels and no API calls, and
+it was never computed until the last day.
+
+The two surviving hypotheses recommend **opposite** actions, which is why this is
+unresolved rather than fixed:
+
+| if test gold size is | trim every set to its first paper | vs current 0.7991 |
+|---|---|---|
+| 1 | ~0.917 (first-is-gold runs 9/10 on validation) | **+0.118** |
+| 2 | 0.6667 (hard ceiling) | **−0.169** |
+
+The question-text cue that would discriminate them does not work: on validation,
+"singular" questions average **2.68** gold papers and "plural" ones **3.50**, so
+the wording carries no set-size signal. `predict_set_size` is guessing.
+

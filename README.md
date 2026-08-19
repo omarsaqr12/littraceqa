@@ -85,7 +85,7 @@ Every claim below has a report and a reproducible experiment behind it.
 | Page alignment is not the cap (72.8% agreement, no offset) | `reports/e4_e6_measurements.md` |
 | Gold table cells are never null (0/27) | `reports/e4_e6_measurements.md` |
 | ~~No free selector beats `gemini-flash-lite`~~ **retracted** — it was a rate-limit artefact | `reports/free_selectors_and_evidence.md` |
-| Cerebras selector: +0.0280 validation, **0.0000 test** (71/71 same papers) | `reports/free_selectors_and_evidence.md` |
+| Cerebras selector: +0.0280 validation; changes 26/71 test papers (transfer untested) | `reports/free_selectors_and_evidence.md` |
 | Full-text indexing is a `multi_paper` lever; test-like family is 96% reachable | `reports/free_selectors_and_evidence.md` |
 | Where evidence loses, item by item | `reports/free_selectors_and_evidence.md` |
 | Local reader vs hosted (lost on test) | `reports/local_reader.md` |
