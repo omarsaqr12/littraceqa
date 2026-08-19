@@ -207,3 +207,46 @@ single gold item, two predictions with one hit score F1 2/3; a coin flip between
 them averages 1/2. Applied twice, both times after confirming both locations
 hold the value: `ltqa_dc59b0be539a1b22` (prose and Figure 6, same page) and
 `ltqa_f6ae14ff5b8d177b` (Figure 1 p1 and Table 1 p6).
+
+## A bug in my own option-scoring probe (and what it hid)
+
+The first version of the MC option scorer stripped whitespace before matching.
+That glues adjacent table cells together: UKBOB's Table 1 row reads
+`... N/A 16,825,000 5,800,000 ...`, which flattens to `N/A16,825,0005,800,000`,
+and the standalone-token test then rejects **both** numbers because each is
+flanked by a digit. Table numbers are precisely what these questions ask about,
+so every "absent" verdict from that version was worthless.
+
+Fixed by collapsing whitespace instead of removing it. Re-run over all 50 MC
+questions, it flags two, and both resolve against the source:
+
+* `ltqa_394b3fcabbc496d9` -- 0.11 looked absent while 0.06, 0.08 and 0.14 looked
+  present. Those three are **axis tick labels** of Figure 1, not data. Table 1 on
+  p6 gives C-NICP on D-FAUST as **0.108**, so option C (0.11) is right and was
+  already our answer.
+* `ltqa_98ff929cb222a1b3` -- the missing "60" belongs to the word-colour paper
+  that is not findable in the pool; the MAE half (0.668) is confirmed.
+
+## Fourth MC correction: the two papers date LDA differently
+
+`ltqa_bde426d34c7e10bd` asks which citation both papers use "as the canonical
+Latent Dirichlet Allocation citation". They do not use the same one:
+
+* `naacl2025_00627` (Instruct-LF) writes "Blei et al., 2009" on p1, p2, p3 and
+  p5, and its own reference list on p9 reads "David M. Blei, A. Ng, and Michael
+  I. Jordan. **2009**. Latent dirichlet allocation."
+* `naacl2025_01120` (LLMs-in-the-Loop) writes "(Blei et al., **2003**)" on p1.
+
+Option B is the only one that states that split, so the answer moved D -> B.
+Recorded as a judgement call: the question's premise that the two match is
+false, and B is too specific to be an accidental distractor -- but if the grader
+only opened one of the two papers, the gold is A or D and this costs one
+question.
+
+### Answers verified and left alone in this pass
+
+`ltqa_1a7bdefccf618e42` (p4: "determinant of the covariance matrix det(sigma_n)"),
+`ltqa_3bfb8111c92ba3d5` (O(1/sqrt(T)) with EXP3, p1/p2/p4),
+`ltqa_b18f17b22f0bfdbe` (p3: FiSAO uses "level feedback from the visual encoder"),
+`ltqa_571b8ccefde36062` (Table 1 p3: Abdomen Atlas 16,825,000 label masks,
+Total Segmentator 400,000 images -- both in the column the question names).
