@@ -20,11 +20,31 @@ Component weights: paper 1/3, evidence 1/3, MC 1/9, table row F1 1/9, table cell
 | H4 | emit evidence to the marginal threshold | **killed** — recall +0.032, precision −0.028 |
 | H7 | full-text mention verification | **killed** — 1 paper dropped in 55, +0.003 |
 | H8 | over-generate table rows | folded into H2; row keys are not the constraint |
+| H14 | cerebras `gpt-oss-120b` as selector, single-stage swap | **+0.0280 val, CI [−0.012, +0.081]** — retracts the earlier "no free selector wins"; submitted as v13 |
+| H15 | full-text index to lift 71% -> 89% reachability | **killed** — the whole 18-pt gap is in `multi_paper`; test-like family is already 96% reachable |
 | — | deeper LLM shortlist (20→30) | +0.0109 val, **−0.0026 test** |
 | — | selector self-consistency (3 votes) | +0.0085, CI [−0.023, +0.052] — not shippable |
 | — | free selectors (gpt-oss-120b, glm-4.7, qwen) | all **below** flash-lite |
 
 ## Still open
+
+## H16 · A shared rate limiter across clients
+
+The reader and the selector hold independent `RateLimiter` instances against one
+provider quota, so their sum exceeds the cap and the excess becomes silent
+fallback to the top BM25 candidate. This one defect inverted the free-selector
+table (0.5538 "loss" vs 0.6182 measured clean). Every multi-client run in this
+repo is suspect until it is fixed. **Test:** move the limiter to a module-level
+registry keyed by base_url; re-run the three-stage Cerebras config, which was
+abandoned for exactly this reason.
+
+## H17 · Cerebras selector with self-consistency voting
+
+`LLMPaperSelector.select()` already supports majority vote over samples, and at
+~\$0.001/call three votes over 71 questions is \$0.21. Voting paid nothing on
+`flash-lite`, but a 120B model with a wider output distribution is the case where
+it should. **Test:** `--llm-select-samples 3` against the v13 config; the
+comparison is free of the baseline-drift problem because v13 is in-session.
 
 ## H5 · `test-extra` as the statistical dev set
 **Component:** all · **Expected:** indirect · **Cost:** 2h

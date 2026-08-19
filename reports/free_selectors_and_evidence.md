@@ -118,3 +118,121 @@ making with hours left on the clock.
 enumerated locator list is a reasonable architecture and this says little about
 it. What it does say: swapping the provider under three stages at once, on
 deadline day, was the wrong-sized change to attempt.
+
+---
+
+## Retraction: the Cerebras selector is better, and the earlier table was measuring rate limits
+
+The section above concluded that no free provider beats `gemini-flash-lite` at
+selection. **That conclusion was an artefact and is withdrawn.** Re-measured as a
+single-stage swap — Cerebras carrying selection only, Gemini left in place for
+reading and synthesis, both arms run in the same session with identical flags:
+
+| component | gemini selector | cerebras `gpt-oss-120b` | delta |
+|---|---|---|---|
+| paper F1 | 0.5984 | **0.6182** | +0.0198 |
+| evidence F1 | 0.3240 | **0.3421** | +0.0181 |
+| MC | 0.5854 | **0.6098** | +0.0244 |
+| table row F1 | 0.5338 | **0.5797** | +0.0459 |
+| table cell acc | 0.2838 | **0.3525** | +0.0687 |
+| **overall** | **0.4634** | **0.4914** | **+0.0280** |
+
+Both arms: 1 error, 0/55 empty evidence. Paper selection differs on 12 of 55
+questions, and every downstream component moves in the same direction — the shape
+you expect when selection improves, because selection multiplies into everything.
+
+The earlier table scored this same model at 0.5538 against a 0.5837 baseline, a
+**loss** of 0.0299. Two faults produced that inversion, and both were mine:
+
+1. **58 errors on a 25 rpm cap.** Every failed selector call falls back to the
+   top-ranked candidate, so the arm was part model and part BM25. The report said
+   as much and still published the ordering as "probably real." It was not real;
+   it was inverted. At 10 rpm the same model errors once.
+2. **The baseline was quoted from an older report, not re-run.** The control
+   re-measured in the same session scores **0.4634**, not the 0.4545 on file —
+   0.0089 of apparent gain was drift between sessions. This repo has a written
+   rule against exactly this (`README.md`, "both arms of an A/B must come from
+   the same session"), added after the local-reader reversal, and I broke it
+   again here.
+
+**The honest caveat on the +0.0280.** Paired bootstrap over 55 questions, 4000
+reps: **95% CI [−0.0121, +0.0806], P(delta > 0) = 0.886.** The interval spans
+zero and is 3.3× the width of the effect. That is the same regime as the three
+changes that were decided inside a wide CI and returned zero or worse on test.
+So this is a *promising point estimate, not a demonstrated gain*, and it is
+reported as one.
+
+It is still worth submitting, for a reason independent of the statistics: the
+leaderboard keeps the best score per team, so an additional entry has bounded
+downside. v11 (0.5493) and v12 (0.5413) were both submitted after v9 and rank 7
+at 0.5519 held.
+
+### What the abandoned three-stage run actually showed
+
+Read back with this result in hand, the earlier all-Cerebras attempt was not
+evidence against the model at all. Paper F1 rose (+0.0175) while evidence and
+table collapsed, and the run logged 81 errors — one stage was working and two
+were starving on a shared rate limit. The correct inference was available at the
+time: *split the swap and re-measure the stage that improved*. Instead the whole
+architecture was abandoned on deadline day. The lesson is not about Cerebras. It
+is that a multi-stage swap cannot be interpreted, so it should never be the first
+experiment.
+
+## Full-text indexing does not pay on the test regime
+
+Candidate recall is capped at 71% by title+abstract reachability, and full text
+lifts reachability to 89%. That 18-point gap was the largest unexploited lever on
+file. It is **not worth building**, and the reason is a two-minute measurement
+that should have been taken before the lever was ever written down as a
+priority — where the question's mention of a gold paper actually lives, split by
+task family:
+
+| task family | n | in title/abstract | body only | nowhere |
+|---|---|---|---|---|
+| `hidden_source_single_paper` (test-like) | 24 | 23 (96%) | **1 (4%)** | 0 |
+| `multi_paper` (cluster) | 100 | 65 (65%) | 21 (21%) | 14 (14%) |
+
+The entire 18-point gap lives in `multi_paper`, which is 53% of validation and
+**absent from the test split**. On the test-like family, title+abstract already
+reaches 96% of gold papers and a full-text index would move at most one question
+in twenty-four. The lever was real and pointed at the wrong split.
+
+### …and it does not transfer, because selectors are saturated on the test regime
+
+`test_v13` ran the config above on the test split. The Cerebras selector genuinely
+executed — the client cache grew from 241 to 300 entries, 59 fresh calls plus 12
+replayed — and it chose **the same papers as `gemini-flash-lite` on all 71 of 71
+questions.**
+
+| comparison | paper_ids differ | evidence differs |
+|---|---|---|
+| v9 (gemini selector) vs v13 (cerebras selector) | **0/71** | 29/71 |
+
+So v13's paper F1 is *identically* v9's 0.7991, and the +0.0198 measured on
+validation transfers as exactly zero. The 29 evidence differences are fresh reader
+calls, i.e. run-to-run noise of the kind already quantified at ±0.011.
+
+**v13 is therefore not an improvement. It is a re-draw of v9.** Submitting it is
+variance harvesting — a free lottery ticket, because the board keeps the best per
+team — and it should not be described as anything else.
+
+Why the transfer fails is the useful part. Selector agreement tracks how
+identifiable the paper is:
+
+| split / family | selector agreement |
+|---|---|
+| validation, `multi_paper` (cluster) | 15/29 changed → 48% agreement |
+| validation, `hidden_source_single_paper` | 3/26 changed → 88% agreement |
+| **test** | **0/71 changed → 100% agreement** |
+
+When the question names its paper, every competent selector converges on the same
+shortlist entry, and swapping models cannot help. This is the same boundary the
+full-text lever ran into one section above, reached from the other side: **both of
+the two largest remaining levers are levers on `multi_paper`, and `multi_paper` is
+not in the test set.**
+
+It also reframes the standing 0.20 test paper-F1 gap. That gap is *not* selector
+quality — two independent models agree unanimously and both leave it. It is
+candidate recall: the gold paper is not in the top-20 shortlist for the selector
+to find. Shortlist construction, not selection, is where the remaining test
+headroom is, and no experiment in this repo has attacked it directly.
