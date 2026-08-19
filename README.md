@@ -19,6 +19,7 @@ Rank 1 is 0.7837.
 | v6 | 0.6474 | 0.3887 | 0.82 | 0.2849 | 0.0952 | 0.4787 |
 | **v9 / v10** | **0.7991** | **0.4737** | 0.78 | 0.2738 | 0.0952 | **0.5519** |
 | v11 | 0.7967 | 0.4667 | 0.82 | 0.2738 | 0.0595 | 0.5493 |
+| v13 (cerebras selector) | 0.7991 | not submitted | — | — | — | re-draw of v9 |
 
 Winning config: `--llm-select --visual-table --max-papers 3`.
 
@@ -83,7 +84,9 @@ Every claim below has a report and a reproducible experiment behind it.
 | Evidence padding loses (marginal-add rule does not apply) | `reports/table_stage.md` |
 | Page alignment is not the cap (72.8% agreement, no offset) | `reports/e4_e6_measurements.md` |
 | Gold table cells are never null (0/27) | `reports/e4_e6_measurements.md` |
-| No free selector beats `gemini-flash-lite` | `reports/free_selectors_and_evidence.md` |
+| ~~No free selector beats `gemini-flash-lite`~~ **retracted** — it was a rate-limit artefact | `reports/free_selectors_and_evidence.md` |
+| Cerebras selector: +0.0280 validation, **0.0000 test** (71/71 same papers) | `reports/free_selectors_and_evidence.md` |
+| Full-text indexing is a `multi_paper` lever; test-like family is 96% reachable | `reports/free_selectors_and_evidence.md` |
 | Where evidence loses, item by item | `reports/free_selectors_and_evidence.md` |
 | Local reader vs hosted (lost on test) | `reports/local_reader.md` |
 | Submission log with component breakdowns | `reports/leaderboard_gap.md` |
@@ -97,9 +100,15 @@ Every claim below has a report and a reproducible experiment behind it.
 2. **Paper selection multiplies into everything.** Evidence recall is bounded by
    `paper_recall × locator_accuracy`, and MC is 0.600 with a correct paper against
    0.062 without. Every downstream gain this project made came from selection.
-3. **77% of validation gold papers are never named in their own question.** No
-   retriever can reach them; that is the `multi_paper` cluster regime, and it is
-   why validation paper F1 (0.59) sits far below test (0.80).
+3. **Validation and test are different problems, and only one of them is scored.**
+   77% of validation gold papers are never named in their own question — the
+   `multi_paper` cluster regime, absent from test, which is why validation paper F1
+   (0.60) sits far below test (0.80). Both of the largest levers found late,
+   full-text indexing and a stronger selector, turned out to be levers on
+   `multi_paper` and measured **zero** on test. Check which regime a lever serves
+   before building it. The remaining test headroom is candidate recall — getting
+   the gold paper into the shortlist — because two independent selectors agree on
+   71/71 test questions and both leave the same 0.20 gap.
 
 ## Method notes
 
@@ -111,7 +120,13 @@ Two rules learned the expensive way, both from repeated failures here:
   (+0.0542) transferred.
 * **Both arms of an A/B must come from the same session with the same flags.**
   Quoting one arm from an older report produced a local-vs-hosted conclusion that
-  test reversed.
+  test reversed — and then, after this rule was written down, produced a
+  free-selector conclusion that had to be retracted. Re-running the control moved
+  the baseline 0.0089.
+* **Read the error counter before the score, and never publish an ordering taken
+  from a run with errors.** A failed call falls back silently, so a rate-limited
+  arm is part model and part BM25. This inverted the sign of a result: 0.5538
+  "loss" at 58 errors, 0.6182 win at 1 error.
 
 ## Layout
 
