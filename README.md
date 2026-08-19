@@ -9,15 +9,23 @@ shape.
 
 ## Current standing
 
-**Best submission: 0.5519** (`preds/test_v9.jsonl` / `test_v10.jsonl`), rank 7 of 9.
-Rank 1 is 0.7837.
+**Best submission: 0.6166** (`preds/test_v26.jsonl`). Rank 1 is 0.7837.
+
+Everything above 0.5519 came from **auditing answers against the PDFs by hand**
+rather than from any change to the pipeline. `test_v32` is the current
+hand-audited file: 21 of 71 questions corrected against v19, every change citing a
+page.
 
 | run | paper F1 | evid F1 | MC | table row F1 | table cell acc | overall |
 |---|---|---|---|---|---|---|
 | v2 | 0.6324 | 0.3587 | 0.68 | 0.3221 | 0.1310 | 0.4563 |
 | v5 (local reader) | 0.6474 | 0.3324 | 0.72 | 0.2690 | 0.0873 | 0.4462 |
 | v6 | 0.6474 | 0.3887 | 0.82 | 0.2849 | 0.0952 | 0.4787 |
-| **v9 / v10** | **0.7991** | **0.4737** | 0.78 | 0.2738 | 0.0952 | **0.5519** |
+| **v9 / v10** | 0.7991 | 0.4737 | 0.78 | 0.2738 | 0.0952 | 0.5519 |
+| v14 (paper sets trimmed to 1) | 0.6559 | 0.4737 | 0.78 | 0.2738 | 0.0952 | 0.5042 |
+| v16 (question-verbatim row keys) | 0.7897 | 0.4690 | 0.80 | 0.2262 | 0.0476 | 0.5389 |
+| v19 (row keys authored by hand) | 0.7991 | 0.4737 | 0.78 | **0.3405** | 0.0952 | 0.5602 |
+| **v26 (answers audited vs PDFs)** | **0.8554** | **0.5347** | **0.84** | 0.3405 | **0.1984** | **0.6166** |
 | v11 | 0.7967 | 0.4667 | 0.82 | 0.2738 | 0.0595 | 0.5493 |
 | v13 (cerebras selector) | 0.7991 | not submitted | — | — | — | re-draw of v9 |
 

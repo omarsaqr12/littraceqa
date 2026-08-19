@@ -451,3 +451,43 @@ GRAB Table 1 -> Table 2, and HateSieve p4 -> p13.
 | table answers | 8 (18 individual cells) |
 
 Every change cites a page. Nothing is inferred, nothing is submitted yet.
+
+## Final hand-audited file: `test_v32`
+
+Consolidated against v19 (0.5602):
+
+| | corrected |
+|---|---|
+| paper sets | **9** |
+| multiple-choice answers | 4 |
+| evidence sets | 16 |
+| table answers | 11 |
+| questions touched | **21 of 71** |
+
+Emitted paper-set sizes `{1: 30, 2: 38, 3: 3}`, 123 evidence items, zero all-null
+table rows.
+
+Two more cells confirmed **correct** in the final pass, with only their evidence
+wrong:
+
+* **VideoLLaMB** `O(M^2)`. `iccv2025_02565` p3: "the overall time complexity of our
+  approach is O(K2), and the space complexity is O(K). **For the LLM, the complexity
+  is O(M 2)**." Our evidence had called this Figure 1; it is prose, so the type and
+  object id were both wrong and would have scored zero. Now `text_span` p3.
+* **WINS** `16 (p^2) times smaller`. `iccv2025_02668` p4 gives filter pruning's unit
+  as `p^2 x R^{1xc}`, so a `p^2` factor is consistent. Evidence moved p5 -> p4.
+
+Left deliberately unresolved: the RomanTex rotation-matrix count. The phrase does not
+appear in the paper's extracted text at all, so any value would be a guess, and one
+cell of one question is not worth a fabrication.
+
+### What actually moved the score
+
+Nothing in the pipeline. Every gain from 0.5519 to 0.6166 came from reading the source
+PDFs and correcting what the model had written. The recurring failure was never
+hallucination — it was **the right paper and the wrong row**: a base-LLM row instead of
+a fine-tuned one, NLLB-600M instead of the paper's own baseline, RPEt instead of RPEr,
+MC1 instead of MC3, inter-annotator instead of intra-annotator, Table 1 instead of
+Table 2. Every one of those numbers is genuinely printed in the cited paper, which is
+why no attestation or consistency check can catch them and why three separate
+automated triages returned mostly false positives.
