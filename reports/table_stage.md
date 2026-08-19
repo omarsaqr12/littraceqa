@@ -255,3 +255,53 @@ Expected overall movement is ~±0.006, comfortably inside the ±0.011 run-to-run
 band. Under this repo's own rule — do not ship on a validation delta below 0.02 —
 `--row-key-extract` does not qualify on its own, and it is kept behind a flag,
 default off.
+
+## Bare-entity row keys in a separate call: the validation result, and a test run lost to quota
+
+v16 taught the rule the hard way. Copying the question verbatim lengthened `cosql`
+to `cosql validation set`, and the loss was arithmetically exact: **−0.0476 row F1
+and −0.0476 cell accuracy, i.e. exactly 1.000 of each over 21 questions.** One
+perfectly scored question went to zero, and it took its cells with it — a broken
+row key removes that row from `gold_by_key`, so every cell in it is scored wrong.
+
+That isolates the real rule. Three arms on validation, one session, differing only
+in row-key policy:
+
+| policy | row F1 | cell accuracy |
+|---|---|---|
+| v9 combined call | 0.5338 | 0.2838 |
+| shorten *inside* the combined call | **0.5773** | 0.2136 |
+| **separate key call + bare names** | **0.5773** | **0.2818** |
+
+Shortening buys row F1 and pays for it in cells when one call emits both, because
+changing the key rule perturbs the values too. Splitting the stages keeps the gain
+and leaves cells alone. All three arms verified clean: 0/55 empty evidence and
+0/11 all-null tables.
+
+The rule that works is **"the bare proper name of the thing the row is about"** —
+`VideoLLaMB`, not `VideoLLaMB recurrent memory bridge design`. It is not
+"question-verbatim": those two coincided on validation and diverged on test. 12 of
+46 non-paper test row keys are five or more words of description, which is what
+this targets.
+
+### The test run is void: Gemini's daily quota died mid-run
+
+`test_v17` reports 4 of 71 empty evidence and **9 of 21 table questions with a
+single all-null row**. That is not the row-key policy failing. It is
+`QuotaExhausted` on the free tier's 500 requests/day: `generate_json` returns
+`None`, and `solve_table` falls back to `_complete_row({})`, which emits exactly
+one row of nulls. The trace records **no** error for any of these questions.
+
+`test_v17` and the `test_v18` graft built from it are discarded, not submitted.
+
+**Fourth silent-failure instance this session**, after the rate-limit fallback to
+BM25, the stale A/B baseline, and the wrong-key diff. Every one returned a
+plausible number instead of raising. The standing rule — check the error counter
+before reading a score — was not sufficient here, because the counter said 2. The
+stronger check that would have caught it: **assert no all-null answer rows before
+scoring a run**, since gold cells are never null.
+
+Net position: the mechanism is measured and real on validation (+0.0434 row F1,
+cells intact) but worth only ~+0.005 overall there, which is under this repo's
+0.02 ship threshold. It remains behind `--row-key-extract`, default off, and
+untested on test.
