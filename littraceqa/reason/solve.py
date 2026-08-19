@@ -109,6 +109,23 @@ def rowkey_response_schema(key_column: str) -> dict[str, Any]:
     }
 
 
+SHORT_ROWKEY_RULE = """  Use the **bare proper name** of the thing the row is about and nothing else:
+  the method name, the dataset name, the model name. Not a description of it, not
+  the phrase the question wrapped around it.
+      write "VideoLLaMB"      not "VideoLLaMB recurrent memory bridge design"
+      write "NeRF"            not "Stable Score Distillation iterations for NeRF"
+      write "CoSQL"           not "CoSQL validation set"
+      write "ECM-XL"          not "ECM-XL (100k iterations)"
+  Keep a qualifier only when it is the single thing telling two rows apart, and
+  then keep the shortest form of it ("ECM-XL (102.4M)").
+  Where the row key is a paper title, use the full official title verbatim,
+  including any odd spacing or HTML entities -- titles are the one exception to
+  the shortest-form rule."""
+
+LONG_ROWKEY_RULE = """  Use the exact surface form the question uses for them (a dataset name, a method
+  name, a metric name). Where the row key is a paper title, use the full official
+  title."""
+
 TABLE_PROMPT = """Build the answer table for this question about scientific papers.
 
 QUESTION
@@ -122,9 +139,8 @@ EVIDENCE EXTRACTED FROM THE PAPERS
 
 Rules:
 - Row-key columns are marked ROW KEY. They identify the row and are graded by
-  exact string match, so use the exact surface form the question uses for them
-  (a dataset name, a method name, a metric name). Where the row key is a paper
-  title, use the full official title.
+  **exact string match**, so the surface form decides the grade.
+{rowkey_rule}
 - Emit one row per item the question asks about -- no more. Extra rows cost
   precision.
 - {types}
@@ -145,19 +161,23 @@ exact string match after lowercasing, so the surface form matters as much as the
 content.
 
 Rules, each learned from a graded example:
-- **Copy the row names from the question, not from the papers.** The question
-  names the things being compared; the grader used those names. On validation,
-  44% of gold row keys appear verbatim in the question text and the paper's own
-  wording scored zero.
-- **Strip a parenthetical that only restates a detail.** The question wrote
-  "ECM-XL (100k iterations)" and gold was "ECM-XL". Keep the shortest form that
-  still tells the rows apart.
-- **Keep a qualifier only when it is the sole thing distinguishing two rows,**
-  and then keep it in its shortest form: gold "ECM-XL (102.4M)", not
+- **Use the bare proper name of the thing the row is about, and nothing else.**
+  The method name, the dataset name, the model name -- not a description of it and
+  not the phrase the question wrapped around it.
+      write "VideoLLaMB"   not "VideoLLaMB recurrent memory bridge design"
+      write "NeRF"         not "Stable Score Distillation iterations for NeRF"
+      write "CoSQL"        not "CoSQL validation set"
+      write "ECM-XL"       not "ECM-XL (100k iterations)"
+  Lengthening "CoSQL" to "CoSQL validation set" turned a perfectly scored question
+  into a zero, because a broken row key takes that row's cells down with it.
+- **Take the names from the question**, which is where the grader took them from,
+  but take only the name.
+- Keep a qualifier only when it is the single thing telling two rows apart, and
+  then keep the shortest form: gold "ECM-XL (102.4M)", not
   "ECM-XL (with 102.4M training budget)".
 - Emit one row per item the question asks about, in the order the question lists
-  them, and nothing else. A row F1 is a set F1, so an extra row costs as much as
-  a missing one.
+  them, and nothing else. Row F1 is a set F1, so an extra row costs as much as a
+  missing one.
 - Do not invent rows to pad the table, and do not merge two asked-for items into
   one row.
 
@@ -205,11 +225,14 @@ class AnswerSolver:
     def __init__(
         self, client: GeminiClient, *, mc_samples: int = 3,
         extract_row_keys: bool = False,
+        short_row_keys: bool = False,
     ):
         self.client = client
         self.mc_samples = mc_samples
         #: Decide table row keys in their own call, from the question only.
         self.extract_row_keys = extract_row_keys
+        #: Ask for the bare entity name as the row key rather than a description.
+        self.short_row_keys = short_row_keys
 
     # -- multiple choice ------------------------------------------------------
 
@@ -332,6 +355,8 @@ class AnswerSolver:
                 columns=column_lines,
                 evidence=format_evidence(readings, titles),
                 types=types_note,
+                rowkey_rule=(SHORT_ROWKEY_RULE if self.short_row_keys
+                             else LONG_ROWKEY_RULE),
             ),
             schema=table_response_schema(schema),
             max_output_tokens=2400,
@@ -414,6 +439,8 @@ class AnswerSolver:
                           f"order and fill the other columns:\n{listing}\n\n"
                           + format_evidence(readings, titles)),
                 types="",
+                rowkey_rule=(SHORT_ROWKEY_RULE if self.short_row_keys
+                             else LONG_ROWKEY_RULE),
             ),
             schema=table_response_schema(schema),
             max_output_tokens=2400,

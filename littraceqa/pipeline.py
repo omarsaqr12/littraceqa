@@ -113,6 +113,8 @@ class PipelineConfig:
     mc_samples: int = 3
     #: Table row keys from a dedicated question-only call (see solve.py).
     extract_row_keys: bool = False
+    #: Row keys as bare entity names (see SHORT_ROWKEY_RULE).
+    short_row_keys: bool = False
 
 
 @dataclass
@@ -190,6 +192,7 @@ class Pipeline:
         self.solver = AnswerSolver(
             client, mc_samples=self.config.mc_samples,
             extract_row_keys=self.config.extract_row_keys,
+            short_row_keys=self.config.short_row_keys,
         ) if client else None
 
     # -- stages A-C: paper selection (local, free) -----------------------------

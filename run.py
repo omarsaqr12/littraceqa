@@ -93,6 +93,11 @@ def main() -> int:
                              "exact string match and 44%% of validation gold keys "
                              "appear verbatim in the question, but the combined "
                              "call sees the papers' wording and drifts to it.")
+    parser.add_argument("--short-row-keys", action="store_true",
+                        help="Ask for the bare entity name as a table row key "
+                             "instead of a description of it. v16 showed that "
+                             "lengthening 'cosql' to 'cosql validation set' cost "
+                             "a perfect question; validation gold shortens too.")
     parser.add_argument("--llm-shortlist", type=int, default=20,
                         help="Candidates shown to the LLM selector. Gold coverage "
                              "saturates at top-30 (0.686 -> 0.703); beyond that the "
@@ -205,6 +210,7 @@ def main() -> int:
         llm_select_model=args.llm_select_model,
         visual_table_cells=args.visual_table,
         extract_row_keys=args.row_key_extract,
+        short_row_keys=args.short_row_keys,
         use_expansion=args.expansion,
         max_papers_to_read=args.max_papers,
         mc_samples=args.mc_samples,
