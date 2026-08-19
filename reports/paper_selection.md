@@ -204,3 +204,44 @@ wrong because they came from the wrong source:
 about +0.024 overall: two paper sets, one multiple-choice answer, three table cells
 and three evidence items, every one of them verified against the PDF rather than
 inferred.
+
+## A second triage on papers: four questions had the wrong source
+
+The cell-value triage generalises. Applied to **papers**: flag any selected paper
+whose *full text* never mentions any entity the question names. 16 flagged, and the
+false-alarm pattern is obvious once seen — on a multi-paper question each paper
+legitimately covers only its own half, so the other half's entities are absent.
+The real signal is a question whose entities appear in **none** of its papers.
+
+Combined with the earlier unique-name resolution, four questions had the wrong
+source. Two were found by name resolution (GenieBlue, EpicPRM); two more here:
+
+| question | we had | correct | how it was identified |
+|---|---|---|---|
+| "…the **TokenIT** dataset built for the token-level text-image foundation model" | `iccv2025_00529` (masked generative models) | `iccv2025_00035` **"A Token-level Text Image Foundation Model for Document Understanding"** | the question describes the title |
+| "…the comprehensive **3D spatial reasoning benchmark** built on MS-COCO and HSSD" | `cvpr2025_01307`, `naacl2025_00752` | `iccv2025_00012` **"3DSRBench: A Comprehensive 3D Spatial Reasoning Benchmark"** + `iccv2025_00052` (VQ-FocusAmbiguity) | only pool paper naming CircularEval/FlipEval |
+
+Reading the right papers then corrected both multiple-choice answers, and both had
+been wrong on **every** half:
+
+* **TokenIT / DUO.** `iccv2025_00035` p1: "20 million images and **1.8 billion**
+  token-mask pairs". `iccv2025_00067` p2: "the KITTI dataset with **13** corruption
+  shift types". So **D**; we answered A (1.2 billion, 15).
+* **3DSRBench / VQ-FocusAmbiguity.** The question describes a protocol that feeds a
+  question to an LMM "two or four times with different answer orderings… correct
+  only if all passes are correct". `iccv2025_00012` p4 defines **CircularEval**
+  in those exact words. FlipEval, the paper's own contribution, is a *paired-image*
+  strategy for left/right bias — it is the distractor, and the benchmark uses both,
+  so naming the novel one is the trap. `iccv2025_00052` p4: "an overall **median of
+  3** and mean of 4 segmentations per ambiguous question". So **D**; we answered A
+  (FlipEval, median 4), wrong on both halves.
+
+Note the pattern across all three corrected multiple-choice answers: each time the
+model picked a value that *is* in the paper but answers a different question —
+GenieBlue's un-finetuned baseline row, FlipEval instead of the cited CircularEval.
+These are not hallucinations, they are the distractors the benchmark was built
+around, and they are only separable by reading the source.
+
+`test_v23` differs from the scored v19 on **8 questions**: 4 paper sets, 3
+multiple-choice answers, 6 evidence sets and 7 table cells, every one verified
+against a PDF page that is cited in the record above.
