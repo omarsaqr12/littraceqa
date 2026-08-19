@@ -491,3 +491,41 @@ MC1 instead of MC3, inter-annotator instead of intra-annotator, Table 1 instead 
 Table 2. Every one of those numbers is genuinely printed in the cited paper, which is
 why no attestation or consistency check can catch them and why three separate
 automated triages returned mostly false positives.
+
+## Post-v32 audit (v35)
+
+v32 scored **0.6366** (paper F1 0.8789, evidence F1 0.5606, MC 0.860,
+row F1 0.3405, cell 0.2103), up from v26's 0.6166.
+
+Two new detectors, both built because the value-based triage kept returning
+false positives:
+
+* **name check** -- does every emitted paper's text actually contain a named
+  entity from its question?  A paper that never says "ERASE" cannot be the ERASE
+  paper.
+* **pool name check** -- same question asked against all 27,487 titles, which
+  catches the case the PDF cache cannot: the right paper was never selected, so
+  its text was never there to search.
+
+Four wrong papers found, all confirmed against the PDF:
+
+| question | was | is | proof |
+|---|---|---|---|
+| `ltqa_dada5a958af5068b` | `eccv2024_02070` | `iccv2025_02482` | p2 "BLIP's smaller text encoder/decoder (BERT-base, 110M"; the ECCV paper names BLIP once, in passing |
+| `ltqa_5b08acb319329757` | `naacl2025_01150` | `iccv2025_02101` | Figure 5 p4 carries all three Norm-vs-BG Dice bars |
+| `ltqa_ab60eb571239314b` | `naacl2025_00237` | `naacl2025_00609` | naacl2025_00237 is EAC; ERASE is "Language Modeling with Editable External Knowledge" |
+| `ltqa_090478d0ddf8d27f` | `icml2025_01987` | `iccv2025_00745` | "Figure 1. Reward Model Scoring Paradox", FLUX at 4.29% down |
+
+### Gold structure, measured on validation
+
+* Gold evidence is **one key per gold paper** -- (1,1) 24x, (4,4) 19x, (3,3),
+  (9,9); 43 of 55 questions have exactly one key per paper.
+* Gold **table rows == gold papers** in 9 of 11 validation table questions.
+* Gold almost never pairs a `text_span` with an object on the same page (1 of 64
+  table items), so padding an object item with a same-page span is pure
+  precision loss.  Hypothesis killed before it cost anything.
+* Gold page histogram peaks at **6-7** (65 of 149 items) with only **5 of 149**
+  on page 1.  Ours put 40% of items on pages 1-3.  Re-aiming every item at the
+  densest-then-later page measured **+0.013** evidence F1 on validation -- below
+  the 0.02 bar, so it was not shipped; it was used only to rank items for
+  manual review.
