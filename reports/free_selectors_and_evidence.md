@@ -70,3 +70,51 @@ Two things follow:
 This is why padding evidence did not pay (E5: recall +0.032, precision −0.028).
 The second locator the reader offers is drawn from the same distribution as the
 first, and the first is right half the time on a correctly-selected paper.
+
+---
+
+## Cerebras gpt-oss-120b as reader + selector + solver (paid credits): abandoned
+
+With \$5 of paid Cerebras credit the quota ceiling disappears — measured cost is
+~\$0.001 per call, so a full 71-question reader run is **\$0.21** and \$5 buys ~23
+of them. Cost was never the constraint. Time and rate limits were.
+
+Final validation attempt, gpt-oss-120b carrying selection, reading and answer
+synthesis with no Gemini in the path:
+
+| component | gemini (v9 config) | cerebras | delta |
+|---|---|---|---|
+| paper F1 | 0.5837 | **0.6012** | +0.0175 |
+| evidence F1 | 0.3197 | 0.1782 | −0.1415 |
+| MC | 0.5854 | 0.4878 | −0.0976 |
+| table row F1 | 0.5338 | 0.2792 | −0.2546 |
+| table cell acc | 0.2611 | 0.0519 | −0.2092 |
+| **overall** | **0.4545** | 0.3508 | **−0.1037** |
+
+**This is not a clean capability measurement and should not be cited as one.** The
+run logged **81 errors against 67 successful calls** and left 30 of 55 questions
+with empty evidence. Paper F1 — the one stage that completed reliably — actually
+*improved* (+0.0175), which is the shape you would expect if the reader was
+failing rather than reading badly.
+
+Three provider-specific faults had to be fixed to get even this far, each of
+which produced a plausible-looking zero rather than an error:
+
+1. `chat_template_kwargs` is a llama.cpp extension; Cerebras 400s on it. The
+   first attempt returned evidence 0.0, table 0.0, 55/55 empty evidence.
+2. `gpt-oss-120b` emits `reasoning_tokens` before the JSON body, so
+   `max_tokens=512` truncated every answer into "no parseable JSON".
+3. Gemini quota died mid-run and the selector silently fell back to the top
+   candidate on 40 of 55 questions — paper F1 0.4982, exactly the fallback value.
+
+The unresolved one is rate limiting. Cerebras caps requests per minute even on
+paid credit, and the reader and the selector/solver hold **separate** limiters
+against one shared quota, so their sum exceeds the cap. Dropping to 6 rpm each
+still produced 81 errors and pushed the run to 26.5s/question. Fixing it properly
+means a shared limiter across clients, which is a small change but not one worth
+making with hours left on the clock.
+
+**Abandoned rather than disproven.** A 120B model reading page text with an
+enumerated locator list is a reasonable architecture and this says little about
+it. What it does say: swapping the provider under three stages at once, on
+deadline day, was the wrong-sized change to attempt.
