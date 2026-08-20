@@ -329,3 +329,35 @@ not a solvable-by-thinking problem: the wording is not recoverable from the
 papers or the question. Every further change I could make there is a coin flip
 with a computed cost, which is why the run stops with measured moves rather than
 hopeful ones.
+
+## The scored numbers as an instrument: cell_total = 87
+
+`table_cell_accuracy_micro` is `cell_correct / cell_total`, and cell_total is a
+property of **gold**, not of our file. Reading it off as an exact fraction:
+
+| run | micro | = | correct / total |
+|---|---|---|---|
+| v50 | 0.264368 | 23/87 | 23 |
+| v51 | 0.356322 | 31/87 | 31 |
+| v52 | 0.356322 | 31/87 | 31 |
+
+So gold has exactly **87 comparable cells** across the 21 table questions, we get
+**31**, and the +8 at v51 is precisely `3ad5f1`'s eight NDCG/MAP cells.
+
+## v53: the deltas force one conclusion
+
+v52 scored **0.7634**, a row-sum gain of +0.3333 where I had predicted +0.5833.
+The shortfall is diagnostic. `1d2f37`, `a4bf90` and `69ae5b` have **identical key
+sets in v50 and v52**, so their contributions cancel and only four questions can
+account for D1+D2 = 0.75. `3ad5f1` is pinned independently at +1.0 by the cell
+delta: cells went 0 -> 1.0 at v51, and at v50 only the bare rows existed, so
+nothing matched at v50 and the `+Fake2` keys are what hit.
+
+That leaves `9f1c90 + e9269a + 1d16eb` contributing **-0.25** going long -> short.
+**The original long-descriptor keys were collectively better** -- one of the three
+held a matching key that my shortened form threw away. v53 restores all three
+v50 row sets, which recovers the 0.25 wherever it lives, for a certain 0.7647.
+
+This corrects my earlier reading. I had recorded those three as scoring exactly
+zero under both forms; the joint constraint says one of them was not zero, and
+that my "free retry" was not free after all -- it discarded a hit.
