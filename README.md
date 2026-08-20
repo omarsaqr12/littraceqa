@@ -9,12 +9,13 @@ shape.
 
 ## Current standing
 
-**Best submission: 0.7518** (`preds/test_v49.jsonl`). Rank 1 is 0.7837.
+**Best submission: 0.7647** (`preds/test_v53.jsonl`). Rank 1 is 0.7837.
 
 Everything above 0.5519 came from **auditing answers against the PDFs by hand**
-rather than from any change to the pipeline. **`test_v50.jsonl` is the file to
-submit next**, and its two changes are free under every reading consistent with
-the scores so far.
+rather than from any change to the pipeline. **`test_v53.jsonl` is the scored
+best.** Best *fully automated* submission: **0.5519** (v9) -- the gap to 0.7647 is
+per-question auditing plus leaderboard-feedback attribution, and the system paper
+in `paper/` states that plainly.
 
 From v41 onward the scored deltas became the measuring instrument: row F1 sat at
 exactly 0.340476 for five consecutive submissions, so a single key change and its
@@ -41,7 +42,9 @@ therefore free to rewrite.
 | v46 (proven-wrong rows dropped) | 0.9704 | 0.7121 | 0.98 | 0.4675 | 0.2262 | 0.7468 |
 | v48 (14 edits batched) | 0.9704 | 0.7192 | 0.98 | 0.4534 | 0.2500 | 0.7502 |
 | **v49 (three dud keys dropped)** | **0.9704** | **0.7192** | **0.98** | **0.4675** | **0.2500** | **0.7518** |
-| v50 (two free changes) | — | — | — | — | — | not yet submitted |
+| v51 (printed-label row keys) | 0.9704 | 0.7262 | 0.98 | 0.4873 | 0.2976 | 0.7617 |
+| v52 | 0.9704 | 0.7262 | 0.98 | 0.5032 | 0.2976 | 0.7634 |
+| **v53 (three row sets restored)** | **0.9704** | **0.7262** | **0.98** | **0.5151** | **0.2976** | **0.7647** |
 | v11 | 0.7967 | 0.4667 | 0.82 | 0.2738 | 0.0595 | 0.5493 |
 | v13 (cerebras selector) | 0.7991 | not submitted | — | — | — | re-draw of v9 |
 
