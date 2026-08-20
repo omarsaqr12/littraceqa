@@ -461,3 +461,38 @@ of `ltqa_dcaf2cccb716dcea`, `ltqa_db8e3f7d548a7d24`, `ltqa_ffb8499a6cbd3c4d`,
 All 21 table questions' evidence pages were re-checked against their own cell
 values; none needed changing. LiveBeauty's Year and #Annotator are columns of
 Table 1 on p2 and its session count is prose on p3, which is what we cite.
+
+## v47: the figure-type conditional is absolute
+
+v46 scored **0.7468**, and the row-sum delta was **+0.8222** against my predicted
+0.222+0.333+0.167+0.100 = **0.8222** -- exact. The cell delta was **0.0000**,
+which says my shortened `quantity_asked` strings missed too. Useful negative:
+descriptor cell strings are not recoverable by shortening, so the descriptor
+row-key hedge I was holding off on would likely have been a waste.
+
+Same method as the equation finding, applied to figures. Of the validation
+questions whose wording names a figure, plot or chart, **10 of 10** have gold
+using `figure` (7 figure-only, 3 alongside `text_span`). Not one used text_span
+without a figure.
+
+Two test questions genuinely refer to a figure and carried no figure item:
+
+| question | was | is |
+|---|---|---|
+| `ltqa_c0b2f8616b032d4b` -- says "framework figure" twice | text_span p3 + citation p2 | `Figure 2` p3 ("Illustration of DICE") + `Figure 1` p3 ("The Rep-MTL framework") |
+| `ltqa_b61b62d2801d5f07` -- "illustrate in its overview" | text_span p1 | `Figure 1` p1, right page, wrong type |
+
+Rendering AG2aussian's Figure 1 also re-confirms the answer I switched in v44:
+its bottom row is exactly four applications -- interactive click query,
+open-vocabulary text query, object removal editing, physical simulation -- and
+the abstract says "validation across four applications".
+
+One row-key bet, at a computed 34% break-even: `bed9aa` matched 2 of 3 shorts,
+and GRAB and HCN-PAI are both names those papers give themselves while "Matador"
+is the third paper's *dataset*, not the paper. Its full title is already proven
+wrong, which leaves the title head, so a 4th row carries
+"Hierarchical Material Recognition".
+
+Third question checked and deliberately not changed: `ltqa_f6ae14ff5b8d177b`
+says "evaluation charts" for SCAMP, but SCAMP's figures are all pipeline and
+descriptor diagrams -- the 94.4 lives in Table 5, which we cite.
