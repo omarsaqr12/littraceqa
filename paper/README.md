@@ -1,38 +1,51 @@
-# System description paper --- GroundLM 2026 Shared Task 2 (LitTraceQA)
+# OdeD --- GroundLM 2026 Shared Task 2 (LitTraceQA) system paper
 
-`littraceqa_system.tex` -> `littraceqa_system.pdf`. Official ACL two-column
-style, unmodified. 6 pages of main content plus references (limit is 4--8 + refs).
+`littraceqa_system.tex` -> `littraceqa_system.pdf`
 
     pdflatex littraceqa_system.tex && pdflatex littraceqa_system.tex
 
-## Two things must be filled in before submitting
+Built and verified: **7 pages = 6 of main content + references**, A4, official ACL
+two-column style with no modification to margins, spacing, fonts or page size.
+Compiles with exit 0 and zero LaTeX errors.
 
-1. **Team name.** Line 6: `\newcommand{\teamname}{TEAMNAME}`. It must match, character
-   for character, the immutable name registered on the evaluator Space and the
-   `teamname` field in OpenReview. The organisers require the title to read
-   `<Team Name> at GroundLM 2026 Shared Tasks: <Paper Title>`.
-2. **Author block.** Name, affiliation, contact email. The final system paper is
-   **not** anonymous --- author details are required.
+## Compliance with the organisers' rules
 
-## Submission checklist (from the organisers' page)
+| rule | status |
+|---|---|
+| 4--8 pages main content, references extra | 6 + refs |
+| Official ACL style, unmodified | `acl.sty` as shipped |
+| Title `<Team Name> at GroundLM 2026 Shared Tasks: <Title>` | "OdeD at GroundLM 2026 Shared Tasks: Reading the Scorer ..." |
+| Team name identical on evaluator / paper / OpenReview `teamname` | **OdeD** |
+| Author names, affiliations, contact info | Omar Saqr, Moustafa Gafaar --- both with affiliation and email |
+| Report official evaluator results | Table 2, all 16 scored submissions |
+| Disclose external data, models, tools, APIs, synthetic data | Section 9 |
+| Report dev-set results, run comparisons, ablations | Tables 1 and 2, Sections 5--6, 8 |
+| Error analysis | Section 7 |
+| Conclusion, limitations, ethics | Sections 10--12 |
 
-- [ ] Paper PDF, 4--8 pages main content + references, ACL style unmodified
-- [ ] Team name identical on evaluator / paper title / OpenReview `teamname`
-- [ ] Official evaluator scores reported (not locally computed) --- done, Table 1
-- [ ] JSONL test outputs uploaded to `littraceqa-test` --- the file that produced
-      the reported score
-- [ ] Code / reproducibility materials
-- [ ] External datasets, pretrained models, tools, APIs and synthetic data
-      disclosed --- done, Section 8
+**Affiliations were inferred from the email domains** (`aucegypt.edu`,
+`auto-pulse.co`). Correct them in the `\author` block if either is wrong ---
+that is the one thing in the file that was not verified against a source.
+
+## Before submitting
+
+- [ ] Confirm both affiliations
 - [ ] Run ACL PubCheck on the PDF
+- [ ] Upload the JSONL that produced the reported score to `littraceqa-test`
+- [ ] Attach code / reproducibility materials
 - [ ] Submit via OpenReview: https://openreview.net/group?id=EMNLP/2026/Workshop/GroundLM
 
 Due **19 August 2026, AoE** --- the same clock as the prediction deadline.
 
-## Note on the reported number
+## If a later submission scores higher
 
-Table 1 reports the official evaluator output for every scored submission. The
-headline is 0.7634, but the paper states plainly in the abstract and in
-Section 9 that the best *fully automated* run is 0.5519 and that the difference
-is per-question auditing plus leaderboard-feedback attribution. If a later
-submission scores higher, update Table 1, the abstract, and Section 6 together.
+The paper reports **0.7649** as the official best. To update, edit these four
+places together so the file stays internally consistent:
+
+1. abstract, first sentence (`0.7649`)
+2. introduction, "Every subsequent gain, to $0.7649$"
+3. Table 2 --- append a row, and move the bold to it
+4. Section 6 "Where the score came from" (paper/evidence deltas, and the row F1 /
+   cell accuracy figures), Section 11 first paragraph, and the conclusion
+
+`0.5519` is the best **fully automated** run and should not change.

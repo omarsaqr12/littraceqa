@@ -9,7 +9,8 @@ shape.
 
 ## Current standing
 
-**Best submission: 0.7647** (`preds/test_v53.jsonl`). Rank 1 is 0.7837.
+**Best submission: 0.7649** (`preds/test_v57.jsonl`). Rank 1 is 0.7837.
+**Next to submit: `preds/test_v58.jsonl`**, projected 0.7671 and certain.
 
 Everything above 0.5519 came from **auditing answers against the PDFs by hand**
 rather than from any change to the pipeline. **`test_v53.jsonl` is the scored
@@ -44,7 +45,10 @@ therefore free to rewrite.
 | **v49 (three dud keys dropped)** | **0.9704** | **0.7192** | **0.98** | **0.4675** | **0.2500** | **0.7518** |
 | v51 (printed-label row keys) | 0.9704 | 0.7262 | 0.98 | 0.4873 | 0.2976 | 0.7617 |
 | v52 | 0.9704 | 0.7262 | 0.98 | 0.5032 | 0.2976 | 0.7634 |
-| **v53 (three row sets restored)** | **0.9704** | **0.7262** | **0.98** | **0.5151** | **0.2976** | **0.7647** |
+| v53 (three row sets restored) | 0.9704 | 0.7262 | 0.98 | 0.5151 | 0.2976 | 0.7647 |
+| v55 (caption-semantics swap — regressed) | 0.9704 | 0.7178 | 0.98 | 0.5151 | 0.2976 | 0.7619 |
+| **v57 (swap reverted, two key unions)** | **0.9704** | **0.7319** | **0.98** | **0.4992** | **0.2976** | **0.7649** |
+| v58 (unions reverted + one proven miss dropped) | — | — | — | — | — | projected 0.7671 |
 | v11 | 0.7967 | 0.4667 | 0.82 | 0.2738 | 0.0595 | 0.5493 |
 | v13 (cerebras selector) | 0.7991 | not submitted | — | — | — | re-draw of v9 |
 
