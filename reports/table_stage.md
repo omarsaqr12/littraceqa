@@ -529,3 +529,60 @@ Four wrong papers found, all confirmed against the PDF:
   densest-then-later page measured **+0.013** evidence F1 on validation -- below
   the 0.02 bar, so it was not shipped; it was used only to rank items for
   manual review.
+
+## v44: reading the figures, and the only two row keys I can prove wrong
+
+### Rendering the figures found the 6th MC error
+
+Four MC questions ask for counts that only exist in a figure. Rasterising those
+pages at 2x and reading them settles all four:
+
+| question | what the figure shows | our answer |
+|---|---|---|
+| `ltqa_b61b62d2801d5f07` | ARMO p4: "we classify the models into **eight** distinct categories", and Figure 3's pie labels are Complex/Simple Character, Animal, Bird, Insect, Marine, Plant (+others) | **six — wrong, now A** |
+| `ltqa_25546519dfb273c8` | the p2 prose says it outright: "presents three keyframes interleaved with four tutorial texts" | C, correct |
+| `ltqa_4900eb2c71c890c8` | TAG-WM p3 "operates through four stages"; TADM Figure 1 brackets the pipeline into Latent Encoding / Rescaling / Enhancement / Decoding | D, correct |
+| `ltqa_69178ae8aa769eda` | VLM4D Figure 2 legend: 55% Translational, **19% Rotational**, 17% Counting, 9% False Positives | D, correct |
+
+Two inferences I had made from text were also confirmed visually rather than
+left as guesses: Figure 9 of `naacl2025_00069` has an *inter* row and an *intra*
+row, and the intra row reads ESA 0.149 / ESA-AI 0.333 -- option D's 0.281/0.189
+are the **Pearson** numbers from the MQM panels. And NICP sits just above the 0.1
+gridline in ERNet's Figure 1(b), matching Table 1's 0.108.
+
+**All 50 MC questions are now verified directly against the source.** Exactly one
+was wrong. Since the scored MC is 48/50, one error remains in a question I have
+checked and believe correct; I cannot identify it, and guessing would be
+vandalism.
+
+### Row keys: the arithmetic, and why I am not guessing
+
+Row F1 has been **0.340476 across five scored runs** (v19, v26, v32, v41, v43),
+which makes the scored history a measuring instrument. Diffing row keys between
+runs and attributing the deltas:
+
+* `0ebcb34` -- `cosql`/`sparc` are **right**: lengthening them to "cosql
+  validation set" cost exactly 1.00 of the 21-question sum.
+* `7d7e93` -- `videollamb`/`wins` are **right**: bare names gained 1.00 over the
+  question's longer phrasing.
+* `5b2e21` -- `mdbpe` and `byte-pair visual encoding` are **both wrong**. They
+  were swapped between v26 and v32 and the macro did not move by a thousandth.
+* `a805cd` -- both spellings of the CoT-ICL title are **wrong**, on the same
+  invariance argument across v9 and v19.
+
+Those last two are the only keys I can prove wrong, and only there is an extra
+candidate row free: `cell_total` iterates over **gold** rows, so an extra
+predicted row cannot enlarge the cell denominator. Adding one costs row
+precision and can only add cell recall, which puts break-even at a **26%** hit
+rate, not the 60% a row-F1-only reading suggests.
+
+Blanket hedging was still measured and rejected: carrying both key styles on
+validation moved row F1 **0.5773 -> 0.5571**, because there the bare keys are
+mostly right and the alternative never hit.
+
+### Correction to an earlier note
+
+I recorded that adding a `table` item to every text_span page bearing a table
+caption had "zero effect" on validation. That reading was wrong. It added only 4
+items, and all 4 landed on questions already scoring zero, so the experiment was
+**uninformative, not negative**. It is untested, and I have not shipped it.
