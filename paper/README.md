@@ -16,20 +16,19 @@ Compiles with exit 0 and zero LaTeX errors.
 | Official ACL style, unmodified | `acl.sty` as shipped |
 | Title `<Team Name> at GroundLM 2026 Shared Tasks: <Title>` | "OdeD at GroundLM 2026 Shared Tasks: Reading the Scorer ..." |
 | Team name identical on evaluator / paper / OpenReview `teamname` | **OdeD** |
-| Author names, affiliations, contact info | Omar Saqr, Moustafa Gafaar --- both with affiliation and email |
+| Author names, affiliations, contact info | Omar Saqr, Moustafa Gafaar, both American University in Cairo, with emails |
 | Report official evaluator results | Table 2, all 16 scored submissions |
 | Disclose external data, models, tools, APIs, synthetic data | Section 9 |
 | Report dev-set results, run comparisons, ablations | Tables 1 and 2, Sections 5--6, 8 |
 | Error analysis | Section 7 |
 | Conclusion, limitations, ethics | Sections 10--12 |
 
-**Affiliations were inferred from the email domains** (`aucegypt.edu`,
-`auto-pulse.co`). Correct them in the `\author` block if either is wrong ---
-that is the one thing in the file that was not verified against a source.
+Both authors are affiliated with the American University in Cairo, as confirmed
+by the authors. Moustafa Gafaar's contact address is on a different domain; that
+is a contact address, not an affiliation, which is what the rules ask for.
 
 ## Before submitting
 
-- [ ] Confirm both affiliations
 - [ ] Run ACL PubCheck on the PDF
 - [ ] Upload the JSONL that produced the reported score to `littraceqa-test`
 - [ ] Attach code / reproducibility materials
