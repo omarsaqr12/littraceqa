@@ -1,58 +1,54 @@
-# LitTraceQA — GroundLM @ EMNLP 2026 Shared Task
+# LitTraceQA — OdeD's system for GroundLM @ EMNLP 2026
 
-Team **OdeD**. Answer a research question by finding the paper(s) in a
-27,487-paper pool, locating the specific evidence inside them (a table cell, a
-figure panel, an equation, a citation), and emitting the answer in the requested
-shape.
+Team **OdeD** (Omar Saqr, Mostafa Gafaar — The American University in Cairo).
 
-**Deadline 19 Aug 2026 AoE.**
+**Task.** Answer a research question by finding the paper(s) in a 27,487-paper
+pool, locating the specific evidence inside them (a table cell, a figure panel,
+an equation, a citation context), and emitting the answer in the requested shape
+— multiple choice or a structured table.
 
-## Current standing
+**System paper:** [`paper/littraceqa_system.pdf`](paper/) — *OdeD at GroundLM 2026
+Shared Tasks: Reading the Scorer for Literature-Grounded QA*.
 
-**Best submission: 0.7649** (`preds/test_v57.jsonl`). Rank 1 is 0.7837.
-**Next to submit: `preds/test_v58.jsonl`**, projected 0.7671 and certain.
+## Result
 
-Everything above 0.5519 came from **auditing answers against the PDFs by hand**
-rather than from any change to the pipeline. **`test_v53.jsonl` is the scored
-best.** Best *fully automated* submission: **0.5519** (v9) -- the gap to 0.7647 is
-per-question auditing plus leaderboard-feedback attribution, and the system paper
-in `paper/` states that plainly.
+| | official score |
+|---|---|
+| first submission | 0.4563 |
+| best **fully automated** run | **0.5519** |
+| best submission | **0.7649** (`preds/test_v57.jsonl`) |
 
-From v41 onward the scored deltas became the measuring instrument: row F1 sat at
-exactly 0.340476 for five consecutive submissions, so a single key change and its
-effect on the 21-question sum could be attributed uniquely. That is how the
-`paper` row keys were shown to be short names, how three candidate keys were
-shown to have missed, and how individual cells were shown to be wrong and
-therefore free to rewrite.
+The gap between 0.5519 and 0.7649 is per-question auditing against the source
+PDFs plus leaderboard-feedback attribution, not a system that would generalise.
+The paper says so in the abstract and the limitations, and reports the two
+submissions that regressed alongside the ones that helped.
 
-| run | paper F1 | evid F1 | MC | table row F1 | table cell acc | overall |
-|---|---|---|---|---|---|---|
-| v2 | 0.6324 | 0.3587 | 0.68 | 0.3221 | 0.1310 | 0.4563 |
-| v5 (local reader) | 0.6474 | 0.3324 | 0.72 | 0.2690 | 0.0873 | 0.4462 |
-| v6 | 0.6474 | 0.3887 | 0.82 | 0.2849 | 0.0952 | 0.4787 |
-| **v9 / v10** | 0.7991 | 0.4737 | 0.78 | 0.2738 | 0.0952 | 0.5519 |
-| v14 (paper sets trimmed to 1) | 0.6559 | 0.4737 | 0.78 | 0.2738 | 0.0952 | 0.5042 |
-| v16 (question-verbatim row keys) | 0.7897 | 0.4690 | 0.80 | 0.2262 | 0.0476 | 0.5389 |
-| v19 (row keys authored by hand) | 0.7991 | 0.4737 | 0.78 | **0.3405** | 0.0952 | 0.5602 |
-| v26 (answers audited vs PDFs) | 0.8554 | 0.5347 | 0.84 | 0.3405 | 0.1984 | 0.6166 |
-| v32 (21 questions re-audited) | 0.8789 | 0.5606 | 0.86 | 0.3405 | 0.2103 | 0.6366 |
-| v41 (7 wrong papers, 4 MC, 21 evidence) | 0.9704 | 0.6610 | 0.94 | 0.3405 | 0.2103 | 0.7095 |
-| v43 (equation_algorithm evidence, 5th MC) | 0.9704 | 0.7121 | 0.96 | 0.3405 | 0.2103 | 0.7287 |
-| v44 (figures read; 6th MC) | 0.9704 | 0.7121 | 0.98 | 0.3516 | 0.2103 | 0.7322 |
-| v45 (short paper row keys added) | 0.9704 | 0.7121 | 0.98 | 0.4283 | 0.2262 | 0.7425 |
-| v46 (proven-wrong rows dropped) | 0.9704 | 0.7121 | 0.98 | 0.4675 | 0.2262 | 0.7468 |
-| v48 (14 edits batched) | 0.9704 | 0.7192 | 0.98 | 0.4534 | 0.2500 | 0.7502 |
-| **v49 (three dud keys dropped)** | **0.9704** | **0.7192** | **0.98** | **0.4675** | **0.2500** | **0.7518** |
-| v51 (printed-label row keys) | 0.9704 | 0.7262 | 0.98 | 0.4873 | 0.2976 | 0.7617 |
-| v52 | 0.9704 | 0.7262 | 0.98 | 0.5032 | 0.2976 | 0.7634 |
-| v53 (three row sets restored) | 0.9704 | 0.7262 | 0.98 | 0.5151 | 0.2976 | 0.7647 |
-| v55 (caption-semantics swap — regressed) | 0.9704 | 0.7178 | 0.98 | 0.5151 | 0.2976 | 0.7619 |
-| **v57 (swap reverted, two key unions)** | **0.9704** | **0.7319** | **0.98** | **0.4992** | **0.2976** | **0.7649** |
-| v58 (unions reverted + one proven miss dropped) | — | — | — | — | — | projected 0.7671 |
-| v11 | 0.7967 | 0.4667 | 0.82 | 0.2738 | 0.0595 | 0.5493 |
-| v13 (cerebras selector) | 0.7991 | not submitted | — | — | — | re-draw of v9 |
+## What is worth reading here
 
-Winning config: `--llm-select --visual-table --max-papers 3`.
+Most of the score came from studying the scorer rather than from modelling, so
+the findings live in `reports/`:
+
+| file | what it records |
+|---|---|
+| `reports/scoring_and_fixes.md` | the metric decomposition, and score-guided attribution — decoding the macro metrics arithmetically to identify *which* prediction is wrong |
+| `reports/table_stage.md` | the annotation conventions recovered from 55 dev examples: one evidence key per paper, gold table rows = paper count (8/8), row keys reproduce the paper's printed labels |
+| `reports/free_selectors_and_evidence.md` | the evidence type conditionals (figure 10/10, table 3/3, equation 4/7) and the seven wrong papers found by entity-presence checks |
+| `reports/paper_selection.md` | retrieval, reranking, shortlist recall saturation |
+| `HYPOTHESES.md` | what was tried and refuted, with the measurement that killed it |
+
+Six heuristics were measured and dropped, and four bugs in our own verification
+scripts are documented — an analysis pipeline is itself an instrument, and ours
+was wrong four times in ways invisible until checked.
+
+## Reproducing
+
+    bash scripts/download_data.sh          # data is not committed (CC BY-NC 4.0)
+    cp .env.example .env                   # add your own API keys
+    python run.py --llm-select --visual-table --max-papers 3 --split test
+
+`preds/` and `logs/` are gitignored, so `reports/` is the record of every
+measurement. The five verifiers that ran over every candidate submission, and the
+scripts that generated the paper's figures, are included.
 
 ## The scoring function
 

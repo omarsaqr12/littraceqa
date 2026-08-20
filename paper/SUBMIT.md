@@ -9,7 +9,7 @@ Deadline: **19 August 2026, AoE** (= 20 Aug 12:00 UTC)
 
 **Title**
 ```
-OdeD at GroundLM 2026 Shared Tasks: Reading the Scorer -- Metric Decomposition and Annotation-Convention Recovery for Literature-Grounded QA
+OdeD at GroundLM 2026 Shared Tasks: Reading the Scorer for Literature-Grounded QA
 ```
 
 **teamname** (must be identical to the evaluator registration)

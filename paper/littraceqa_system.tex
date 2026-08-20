@@ -13,10 +13,11 @@
 \usepackage{amsmath}
 \usepackage{url}
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc}
 
 \title{OdeD at GroundLM 2026 Shared Tasks:\\
-Reading the Scorer --- Metric Decomposition and Annotation-Convention
-Recovery for Literature-Grounded QA}
+Reading the Scorer for Literature-Grounded QA}
 
 \author{Omar Saqr \\
   The American University in Cairo \\
@@ -96,6 +97,51 @@ is not hallucination but \emph{the right paper and the wrong row}
 
 \begin{figure*}[t]
 \centering
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw, rounded corners=1.6pt, align=center, inner sep=3.2pt,
+              minimum height=7.2mm, fill=black!3},
+  hot/.style={box, fill=blue!7, draw=blue!55, very thick},
+  ar/.style={-{Latex[length=1.7mm]}, line width=0.5pt},
+  note/.style={font=\scriptsize\itshape, align=center, text=black!62},
+  gain/.style={font=\scriptsize\bfseries, align=center, text=blue!62}]
+
+\node[box] (q)   at (0,0)      {Question};
+\node[box] (ret) at (2.05,0)   {Retrieval\\+ rerank};
+\node[box] (sel) at (4.15,0)   {LLM\\selection};
+\node[box] (rd)  at (6.20,0)   {PDF\\reading};
+\node[box] (ans) at (8.35,0)   {Answer\\+ evidence};
+\node[hot] (ver) at (10.65,0)  {Verification\\{\scriptsize 5 checks}};
+\node[box] (sub) at (12.85,0)  {Submission};
+
+\foreach \a/\b in {q/ret, ret/sel, sel/rd, rd/ans, ans/ver, ver/sub}
+  \draw[ar] (\a) -- (\b);
+
+% the loop: submission -> metric feedback -> back into verification
+\node[hot] (fb) at (10.65,-1.75) {Metric feedback\\{\scriptsize score-guided attribution}};
+\draw[ar] (sub.south) |- (fb.east);
+\draw[ar] (fb.north) -- (ver.south);
+
+\node[note, anchor=north] at (2.05,-0.62) {paper F1\\$0.410\!\to\!0.490$};
+\node[note, anchor=north] at (4.15,-0.62) {$\le\!3$ papers};
+\node[note, anchor=north] at (6.20,-0.62) {text $+$ raster};
+\node[gain, anchor=south] at (3.10,0.52)  {$0.4563 \to 0.5519$};
+\node[gain, anchor=south] at (7.60,0.52)  {$\to 0.7095$\\{\scriptsize 7 wrong papers}};
+\node[gain, anchor=south] at (11.75,0.52) {$\to 0.7322$\\{\scriptsize evidence types}};
+\node[gain, anchor=east]  at (8.85,-1.75) {$\to 0.7649$\\{\scriptsize row keys, cells}};
+\end{tikzpicture}
+\caption{Our system and where each stage moved the official score. The unshaded
+path left to right is the pipeline, which plateaued at $0.5519$. The two shaded
+boxes are what actually produced the rest: a verification pass that checks every
+prediction against the source PDF, and a feedback loop in which the evaluator's
+macro metrics are decoded arithmetically to identify \emph{which} individual
+predictions are wrong (\S\ref{sec:attribution}) before the next submission.
+Figure~\ref{fig:progress} gives the per-component detail.}
+\label{fig:pipeline}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
 \includegraphics[width=\textwidth]{progress.pdf}
 \caption{Official evaluator score for each of our sixteen scored submissions, in
 submission order. The shaded region is the pipeline; everything after it is the
@@ -123,8 +169,9 @@ accuracy, table row F1 and table cell accuracy carry $1/9$ each. This is the
 single most consequential fact about the task and it is easy to miss: an
 intuition that answer accuracy is the objective puts effort in the wrong place.
 On our first submission multiple-choice accuracy was already $0.68$ while
-evidence F1 was $0.3587$. Figure~\ref{fig:progress} shows how the
-components moved across all sixteen of our submissions, and
+evidence F1 was $0.3587$. Figure~\ref{fig:pipeline} gives the system and where each stage moved the
+score; Figure~\ref{fig:progress} shows how the components moved across all
+sixteen of our submissions, and
 Table~\ref{tab:example} gives one question end to end.
 
 \paragraph{Evidence keys are coarse.}
