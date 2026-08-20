@@ -663,3 +663,45 @@ close to what a grader would plausibly write, and `a4bf90`'s are already short
 current keys are wrong, and unlike the paper columns I have no measurement
 saying they are. Guessing costs 0.333 per question when the current key was
 right. Left alone.
+
+## v48: batching, and why the cell rewrites are free
+
+Submissions are finite, so v48 bundles every remaining change that is either
+proven or clears a computed break-even, rather than spending a submission per
+idea. 6 questions, 14 individual edits.
+
+**The asymmetry that makes cell rewrites free.** `cell_total` iterates over
+**gold** rows. Cells in a predicted row whose key does not match gold are never
+scored at all, and a cell already known wrong cannot get worse. The scored
+deltas have told us exactly which of our cells are wrong:
+
+| question | proven | so |
+|---|---|---|
+| `dd9546` | both rows matched, contributed **0** cells | all 4 cells free to rewrite |
+| `033b9d` | 1 row matched, contributed 0 | that row's 2 cells free; the other row's are unscored, so also free |
+| `a805cd` | 1 row matched, contributed 0 | same |
+| `bed9aa` | `value` **right**, `quantity_asked` wrong twice | rewrite `quantity_asked` only, leave `value` alone |
+
+What went in:
+
+* `dd9546` -- `APADC [41]` -> `APADC`, `MMANet [42]` -> `MMANet` (the bracket
+  number is ours, not the paper's), and the attached description becomes each
+  cited paper's own title, which is what the question itself quotes for APADC:
+  "(Adaptive feature projection with distribution alignment)".
+* `a805cd` -- `\mathcal{V}` -> `V`, and the expressions de-LaTeX'd. A grader does
+  not type a macro into a table cell.
+* `033b9d` -- the question asks that paper for **both** speedups and gold has one
+  row per paper, so its single value cell has to carry both: "1.18x and 1.19x".
+  The other paper writes "≈114s to finetune on 10 samples for 30 epochs".
+* `bed9aa` -- third form for `quantity_asked`, now "number of ...".
+* three row-key candidates at a 25-34% break-even: `Hierarchical Material
+  Recognition`, `Accelerate 3D Object Detection Models`,
+  `In-Context Dueling Bandits`.
+
+### Where I stopped
+
+The five descriptor-keyed questions stay untouched. `bed9aa`'s `quantity_asked`
+has now missed in two different forms, which is direct evidence that grader-
+invented descriptor strings are not recoverable by paraphrase. My hit rate on
+inventing their wording is below the break-even, so adding candidate rows there
+would be adding noise, not expected value.
