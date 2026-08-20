@@ -3,7 +3,7 @@
 % Team name "OdeD" must match the evaluator registration and the OpenReview
 % teamname field exactly.
 \documentclass[11pt]{article}
-\usepackage[]{acl}
+\usepackage[final]{acl}
 \usepackage{times}
 \usepackage{latexsym}
 \usepackage[T1]{fontenc}
@@ -12,6 +12,7 @@
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{url}
+\usepackage{graphicx}
 
 \title{OdeD at GroundLM 2026 Shared Tasks:\\
 Reading the Scorer --- Metric Decomposition and Annotation-Convention
@@ -22,7 +23,7 @@ Recovery for Literature-Grounded QA}
   \texttt{omar\_saqr@aucegypt.edu} \\\And
   Moustafa Gafaar \\
   American University in Cairo \\
-  \texttt{mostafa.gaafar@auto-pulse.co}}
+  \texttt{mostafa21314@aucegypt.edu}}
 
 \begin{document}
 \maketitle
@@ -93,6 +94,20 @@ is not hallucination but \emph{the right paper and the wrong row}
 (\S\ref{sec:errors}).
 \end{enumerate}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{progress.pdf}
+\caption{Official evaluator score for each of our sixteen scored submissions, in
+submission order. The shaded region is the pipeline; everything after it is the
+audit loop and score-guided attribution. The two components weighted $1/3$
+(paper F1, evidence F1) account for almost all of the movement, while the two
+table components weighted $1/9$ stall around $0.30$--$0.50$ and hold most of our
+remaining headroom. Submission 15 is the one that regressed: we had labelled a
+caption-semantics inference ``confirmed'' when it was a heuristic, and reverting
+it returned exactly the $+1.0$ of evidence sum the arithmetic predicted.}
+\label{fig:progress}
+\end{figure*}
+
 \section{The Metric Is Asymmetric}
 \label{sec:metric}
 
@@ -108,7 +123,9 @@ accuracy, table row F1 and table cell accuracy carry $1/9$ each. This is the
 single most consequential fact about the task and it is easy to miss: an
 intuition that answer accuracy is the objective puts effort in the wrong place.
 On our first submission multiple-choice accuracy was already $0.68$ while
-evidence F1 was $0.3587$.
+evidence F1 was $0.3587$. Figure~\ref{fig:progress} shows how the
+components moved across all sixteen of our submissions, and
+Table~\ref{tab:example} gives one question end to end.
 
 \paragraph{Evidence keys are coarse.}
 Predictions and gold are compared as sets of tuples
@@ -122,6 +139,30 @@ wrong type scores zero: ``we found the answer'' is not ``we located it as the
 annotator did''. (iii) Emitting $N$ predictions against $G$ gold items with $C$
 correct gives $F_1 = 2C/(G+N)$, so the cost of hedging is arithmetic rather than
 taste. We use (iii) throughout.
+
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}p{0.955\columnwidth}@{}}
+\toprule
+\textbf{Q} \emph{``\ldots what MATH score does the BlueLM-3B-based MLLM reach
+when fine-tuned on Cambrian~7M plus an extra 2M pure-text samples\ldots?''}\\[2pt]
+\midrule
+\texttt{gold\_papers}: \texttt{iccv2025\_01015} \\
+\texttt{evidence}: \texttt{(iccv2025\_01015, table, p3, "Table 3")} \\
+\texttt{answer.multiple\_choice.gold}: \texttt{B} \\[3pt]
+\emph{Page 3 carries both Table~2 (``expand the Cambrian-7M dataset with 2M pure
+text data'') and Table~3 (``using Cambrian 2.5M''). The question's wording matches
+Table~2 almost verbatim --- and gold cites \textbf{Table~3}. Choosing Table~2 cost
+a full $1.0$ of evidence F1 on this one question, because
+\texttt{object\_id} is part of the key.}\\
+\bottomrule
+\end{tabular}
+\caption{One question, the three coupled outputs, and why the evidence metric is
+unforgiving: the answer and the page are right, and the item still scores zero if
+the visible object id is wrong.}
+\label{tab:example}
+\end{table}
 
 \paragraph{Cell accuracy ignores row precision.}
 Row F1 is a set F1 over row-key tuples, so duplicate row keys silently collapse
@@ -501,15 +542,26 @@ questions and several rest on small denominators ($3/3$, $8/8$, $10/10$). They
 were predictive on test, which is evidence, but they are not established at any
 conventional level of confidence.
 
-Third, our weakest components are the table metrics, and our analysis explains
-why we could not fix them: reproducing a row key an annotator invented is not a
-reasoning problem with a findable answer. This interacts badly with the metric,
-because cell accuracy is gated on row-key recall, so a question whose key wording
-we cannot reproduce contributes zero to two of the five reported metrics no
-matter how correct the extracted values are. We regard this as a property of the
-task's table format at least as much as of our system, and we suggest a future
-edition might either publish the row-key vocabulary alongside the schema or score
-cells against gold rows independently of key matching.
+Third, and we think most usefully for the workshop, part of what the metric
+measures is \emph{reproduction of the annotator's bookkeeping} rather than
+grounding. Two mechanisms do this. Evidence keys include the visible object id,
+so a system that locates the correct claim on the correct page of the correct
+paper scores \textbf{zero} for that item if it writes \texttt{Table 2} where the
+annotator wrote \texttt{Table 3} --- Table~\ref{tab:example} is exactly that case,
+and it cost us a full $1.0$ of evidence F1 on one question. Table cell accuracy is
+gated on exact row-key matching, so a question whose invented key wording we
+cannot reproduce contributes zero to \emph{two} of the five reported metrics no
+matter how correct every extracted value is; we verified the values for several
+such questions and still scored zero on both. Our record of 0 for 13 on guessing
+those strings is evidence that this component is not reducible by better reading.
+
+We do not think this invalidates the benchmark --- provenance should be scored,
+and coarse keys are a reasonable way to do it --- but it does mean the table
+components measure something different from the evidence components, and a
+system's score can move without its grounding improving. A future edition might
+publish the row-key vocabulary alongside the schema, accept any of a small set of
+canonical object-id spellings, or score cells against gold rows independently of
+key matching. Any of the three would make the answer metrics measure answering.
 
 Fourth, we did not submit to \texttt{littraceqa-test-extra}, so we cannot report
 how these findings transfer to its larger question pool.
