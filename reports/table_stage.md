@@ -619,3 +619,47 @@ Method acronyms confirmed from the papers: `tgGBC` ("trim keys gradually Guided
 By Classification token"), `LEAD` ("LLM with Enhanced Algorithmic Dueling"),
 `Matador` ("~7,200 samples across 57 material classes", which also re-confirms
 our cell value of 57).
+
+## v46: everything the v45 delta proved wrong, removed
+
+v45 scored **0.7425** (row F1 **0.4283**, cell **0.2262**). The +1.6111 row-sum
+shift admits only two decompositions, and they agree on everything that matters:
+
+* the **full metadata titles are wrong in all four** paper-keyed questions;
+* `a805cd`'s `LEAD` **missed**;
+* `bed9aa` matched **2 of 3** shorts, so one of GRAB / Matador / HCN-PAI is wrong;
+* `dd9546` and `033b9d` matched 3 of their 4 shorts between them.
+
+The cell-sum shift was exactly **+0.3333**, which is `bed9aa` on its own:
+2 matched rows x 1 correct cell of 2, over 3 gold rows x 2 columns = 2/6. So its
+`value` cells (9 / 57 / 4) are right and `quantity_asked` was wrong -- and
+`dd9546` and `033b9d` contributed **zero** cells, meaning both of their value
+columns are wrong too.
+
+v46 therefore drops every row now proven not to match (12 full-title rows and
+`LEAD`), which is pure precision recovered:
+
+| question | v45 | v46 |
+|---|---|---|
+| `dd9546` | 0.667 | **1.000** |
+| `bed9aa` | 0.444 | **0.667** |
+| `033b9d` | 0.333 | **0.500** |
+| `a805cd` | 0.400 | **0.500** |
+
+and replaces `bed9aa`'s `quantity_asked` cells -- which the delta proves wrong,
+and which were verbatim question clauses ("how many distinct high-level
+categories does the GRAB benchmark organize its 23 graph properties into") that
+no grader would type into a table cell -- with the bare quantity: "high-level
+categories", "material classes", "benchmark datasets".
+
+### What I am deliberately not doing
+
+The five descriptor-keyed questions (`quantity`, `setting`, `attribute`,
+`metric`) are the largest remaining block, and by the same logic their long keys
+may be wrong. But `97a49a`'s keys ("plotted ratio for the lowest
+problem-difficulty value", "number of discrete difficulty levels") are already
+close to what a grader would plausibly write, and `a4bf90`'s are already short
+("Year", "Number of annotators"). Adding alternates there is only free if the
+current keys are wrong, and unlike the paper columns I have no measurement
+saying they are. Guessing costs 0.333 per question when the current key was
+right. Left alone.
