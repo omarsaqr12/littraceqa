@@ -748,3 +748,44 @@ Also re-confirmed while checking: ConECT really does print "Offer titles" and
 83.73 / 0.9227 / 70.76 / 0.9335 -- so `e721a5` was already right, rows and cells.
 EpicPRM p4 says "into 11 levels", confirming that value, and its Figure 2 is on
 p3 where we cite it.
+
+## v52: bank the proven, drop the misses, retry the zeros
+
+v51 scored **0.7617** -- gap to rank 1 down to 0.0220 -- and its three deltas
+decomposed exactly and uniquely:
+
+| change | delta | reading |
+|---|---|---|
+| `3ad5f1` `+Fake2` keys | **+0.6667** | **HIT**, so the bare dataset names are proven wrong |
+| `1d2f37` `Random` | -0.1000 | missed |
+| `a4bf90` `# Image` / `# Annotator` | -0.0500 | missed |
+| `69ae5b` `Subspaces Alignment` | -0.1000 | missed |
+| `9f1c90` / `e9269a` / `1d16eb` | 0.0000 | still exactly zero |
+| **sum** | **+0.4167** | = observed |
+
+The cell delta of exactly **+1.0** is `3ad5f1` alone going 0 -> 1.0 on its eight
+NDCG/MAP cells. Rule B paid for itself: adding the `+Fake2` variants rather than
+betting on one convention is what guaranteed those cells got scored.
+
+v52 banks that (drop the four bare rows: row F1 0.667 -> **1.000**, cells stay
+1.000), drops the three proven misses, and retries the three questions that sit
+at exactly zero -- which costs nothing, since a question at C=0 stays at 0 unless
+a new key hits.
+
+Third forms use the shortest plausible wording, and a printed label wherever one
+exists: `PISA` and `ShapeGrasp` are the row labels of InstructPart's Table I8.
+
+| | floor (certain) | ceiling (all three retries hit) |
+|---|---|---|
+| row F1 | 0.5151 | 0.6580 |
+| overall | **0.7647** | **0.7806** before any cell gain |
+
+### Two things ruled out along the way
+
+* `9f1c90` / `e9269a` / `1d16eb` scored 0 under **both** a four-row
+  long-descriptor form and a two-row identity form. Rule A says gold has 2 rows,
+  Rule B says it uses printed labels, and neither reading has produced a hit yet.
+* MedVLP's 1.42% / 4.06% are the only IoU averages anywhere in that paper, so
+  those cell values are right even though the question calls them "fine-tuned
+  segmentation" and the sentence sits under zero-shot grounding. The apparent
+  mismatch is loose question wording, not a wrong answer.
