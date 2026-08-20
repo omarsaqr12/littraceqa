@@ -403,3 +403,61 @@ Every one of these had its cited page checked and its decoys identified:
 options A and C are identical except for "an A100 GPU" versus "a single A100
 GPU", and p3 is the page that writes "on a single A100 GPU". The option we chose
 is quoting p3, so that is the page the grader was reading.
+
+## v43: equation_algorithm, and a fifth MC correction
+
+**We were emitting zero `equation_algorithm` items.** Gold uses them. Measured on
+validation, among the 7 questions whose wording asks about an equation,
+expression, loss or objective, **4 have gold containing `equation_algorithm`**,
+and 2 of those 4 carry `text_span` as well -- so gold's type here is genuinely
+mixed and committing to one type is a coin flip. Against a single gold item, two
+predictions with one hit score F1 2/3, where picking one scores 0.4 in
+expectation at P(equation)=0.6. So v43 carries both types on the six
+equation-form questions, with every number read off the page:
+
+| question | paper | equation |
+|---|---|---|
+| `ltqa_ab60eb571239314b` | LCIRC p4 / ERASE p4 | (3) / (3) |
+| `ltqa_a805cd7e63c6a6a3` | CoT-ICL p3 / dueling p3 | (1) / unnumbered |
+| `ltqa_e025ced58eec5fd9` | TAAT p4 / DynamicVoyager p4 | (3) / (2) |
+| `ltqa_a2c8b9763a7ce26e` | AccidentalGS p4 / AD-GS p3 | (8) / (1) |
+| `ltqa_8e7d0874e09f6377` | GenM3 p4 | (2) |
+| `ltqa_1a7bdefccf618e42` | iccv2025_00547 p4 | (4) |
+
+For the one unnumbered equation the locator uses `"Equation 0"`, which is gold's
+own placeholder in 3 of its 5 validation equation items. Equations are numbered
+inline, not captioned, so `objcheck` cannot see them; a separate check confirms
+9 of the 10 numbers appear as standalone display tags on the cited page and the
+tenth appears inline.
+
+### Fifth MC correction, wrong on both halves
+
+`ltqa_5e0dfcb644ec0a04` -- we answered B (0.44 / 71.3). Both numbers are real and
+both are the wrong cell:
+
+| asked for | we gave | what 0.44 / 71.3 actually are | correct |
+|---|---|---|---|
+| gpt-3.5-turbo **Prompt Ranking** Macro-F1 on COVID-19 | 0.44 | the **None** row's LOGIC *accuracy* | **0.56** (Table 3 p8) |
+| **dynamic-τ** average COMET | 71.3 | the **Baseline** row's average | **73.0** (Table 14 p17) |
+
+Option D. Same failure as every other one this session: right table, wrong row.
+
+### Two evidence pages that held nothing
+
+`ltqa_eb04a1b29408f7bb` cited p3 and p8; the facts are on p2 ("144 = 16 x 9
+superpixels, where each superpixel consists of 240 x 240 display pixels") and p5
+("prune the Gaussians with opacity in the bottom 5th percentile").
+
+### Verified and left alone
+
+`ltqa_03af2c583a696a04` (p4: "five graph properties", "k = 5 neighbors"),
+`ltqa_cbad41e189930190` (Figure 9 p13 is the inter/intra-annotator figure and its
+Kendall labels are 0.149/0.333/0.109 in ESA/ESAAI/third order -- Figure 8's
+0.254/0.359/0.116 are the decoys), `ltqa_de53de0c4394d292` (p4: "285 object
+scanning sequences", "coverage radius of around 20 m"), plus the numeric halves
+of `ltqa_dcaf2cccb716dcea`, `ltqa_db8e3f7d548a7d24`, `ltqa_ffb8499a6cbd3c4d`,
+`ltqa_fca1b7d3c8a697aa`, `ltqa_a467625518ca3ac4`.
+
+All 21 table questions' evidence pages were re-checked against their own cell
+values; none needed changing. LiveBeauty's Year and #Annotator are columns of
+Table 1 on p2 and its session count is prose on p3, which is what we cite.
