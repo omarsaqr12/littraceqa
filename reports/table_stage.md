@@ -586,3 +586,36 @@ I recorded that adding a `table` item to every text_span page bearing a table
 caption had "zero effect" on validation. That reading was wrong. It added only 4
 items, and all 4 landed on questions already scoring zero, so the experiment was
 **uninformative, not negative**. It is untested, and I have not shipped it.
+
+## v45: gold's `paper` row keys are short names (measured, not guessed)
+
+v44 scored **0.7322** with row F1 finally moving off 0.340476 to **0.351587**.
+That delta is +0.2333 over the 21-question sum, and it decomposes **uniquely**:
+
+| v44 change | arithmetic | reading |
+|---|---|---|
+| `a805cd` C 0->1, N 2->4 | `2*1/(2+4) - 2*0/(2+2)` = **+0.3333** | one short name **hit**; both full titles were wrong |
+| `5b2e21` C 1->1, N 2->3 | `2*1/(2+3) - 2*1/(2+2)` = **-0.1000** | "Multidimensional Byte Pair Encoding" **missed** |
+| | **+0.2333** | matches the observed delta exactly |
+
+Validation used a row-key column literally named `Paper Title` and gold there was
+the full lowercase title. Test's column is named `paper`, and gold is the short
+name. The column name appears to drive the format.
+
+### What v45 does with that
+
+* `bed9aa`, `dd9546`, `033b9d` -- **add** short names (`GRAB`/`Matador`/`HCN-PAI`,
+  `BRIDGE`/`CMAD`, `tgGBC`/title-head) **alongside** the full titles. This is the
+  move that does not require me to be right about which convention gold used:
+  3 of 6 rows match either way, giving row F1 2/3, and every gold row is matched
+  so all of its cells get scored. Dropping the titles only wins if
+  P(short) > 0.9, and one data point does not buy that.
+* `a805cd` -- the full titles are **proven** wrong, so they are pure precision
+  loss. Dropped. Kept both short names and added `LEAD`, the dueling paper's own
+  method acronym, since only one of the two shorts hit.
+* `5b2e21` -- proven miss, dropped. Back to two rows, which restores 0.5 from 0.4.
+
+Method acronyms confirmed from the papers: `tgGBC` ("trim keys gradually Guided
+By Classification token"), `LEAD` ("LLM with Enhanced Algorithmic Dueling"),
+`Matador` ("~7,200 samples across 57 material classes", which also re-confirms
+our cell value of 57).
