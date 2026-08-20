@@ -496,3 +496,39 @@ wrong, which leaves the title head, so a 4th row carries
 Third question checked and deliberately not changed: `ltqa_f6ae14ff5b8d177b`
 says "evaluation charts" for SCAMP, but SCAMP's figures are all pipeline and
 descriptor diagrams -- the 94.4 lives in Table 5, which we cite.
+
+## v55: four more evidence errors, three confirmed by a quoted sentence
+
+Pushing past "the pipeline is exhausted" found real errors. The productive check
+was not value-presence but **caption semantics**: does the cited table's caption
+describe the setting the question asks about?
+
+| question | was | is | proof |
+|---|---|---|---|
+| `ltqa_cf4bd6505d859121` | `Table 3` p3 | **`Table 2`** p3 | Table 2's caption reads "We expand the Cambrian-7M dataset with **2M pure text data** training samples"; Table 3 is "using Cambrian 2.5M". The question says "Cambrian 7M data plus an extra 2M pure-text samples". One-paper question, so worth a full 1.0 |
+| `ltqa_7d7e93465a7c030d` | `iccv2025_02668` p4 | **p5** | "size (R1xc) of the WINS is 16 (p2) times smaller than that" is on p5; p4 carries nothing relevant |
+| `ltqa_bed9aa4a54795d63` | `iccv2025_01115` p3 | **p4** | p4: "We end up with a **distilled set of 57 categories**", matching the question's "distill its vocabulary down to". p3's only mention of 57 is inside a figure caption about a word-occurrence plot |
+| `ltqa_1d16eb94175e070f` | `figure` p4 Fig 2 | + `text_span` p5 | Figure 2 on p4 is "Overview of the proposed texture synthesis framework", not the RoPE formulation, which is Eq (7) on p5. Hedged rather than swapped: the paper defers the RoPE specifics to supplementary material |
+
+### Checks that came back clean
+
+* **Table-type conversion.** P(gold = `table` | a strict line-start caption on the
+  cited page) = **52/68**, a real signal -- but all 7 of our `text_span` items on
+  such pages are verified prose (MDBPE's "farthest point sampling", the 114s
+  fine-tuning time, the superpixel count, ...). Nothing to convert.
+* **Wrong-table-on-a-crowded-page.** 16 items sit on pages carrying more than one
+  same-type caption; reading each table settled 15 of them and produced the
+  GenieBlue correction above.
+* **Bibliography citations.** `c47085`'s four `citation_context` items are all on
+  p10, which is where both papers' reference entries [27]/[28] and [31]/[32]
+  actually sit.
+* **Caption-vs-question word overlap**, tried as an automated version of the above,
+  is too noisy to act on: it flags tables I had already read and confirmed. Recorded
+  so nobody repeats it.
+
+### Correction to an earlier instrument
+
+My table-caption regex matched in-text references such as "...in Table 3.".
+Requiring the caption at line start raised the measured conditional from 71.6% to
+76.5%. This is the third regex of mine to have this class of bug; I checked before
+acting on it this time.
