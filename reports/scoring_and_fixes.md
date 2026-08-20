@@ -250,3 +250,39 @@ question.
 `ltqa_b18f17b22f0bfdbe` (p3: FiSAO uses "level feedback from the visual encoder"),
 `ltqa_571b8ccefde36062` (Table 1 p3: Abdomen Atlas 16,825,000 label masks,
 Total Segmentator 400,000 images -- both in the column the question names).
+
+## v49: undo the three misses, resolve the last ambiguous evidence set
+
+v48 scored **0.7502**. All three deltas decomposed exactly:
+
+| delta | reading |
+|---|---|
+| row **-0.2952** | precisely what three candidate-key misses predict, so all three missed |
+| cell **+0.5000** | two 0.25-steps among dd9546 / a805cd / 033b9d landed |
+| evidence **+0.5000** | one of the two figure fixes landed |
+
+`bed9aa`'s `quantity_asked` is now excluded as well: it can gain at most 0.333
+(2 cells of 6), so it cannot be part of a +0.5. **Three different forms of that
+string have now missed.** Stopping there.
+
+v49 drops the three dud keys, which is a certain recovery of +0.0141 row F1, and
+resolves `ltqa_c0b2f8616b032d4b`. That set scored 0.5 both before and after v48,
+which leaves exactly two possible gold sets:
+
+* **A** `{text_span 02644 p3, figure 01958 p3 Fig 1}`
+* **B** `{figure 02644 p3 Fig 2, citation 01958 p2}`
+
+Emitting one pair is worth 0.75 in expectation against 0.667 for hedging all
+four, so pick the coherent one. A: the question's clause for `02644` mentions no
+figure and its answer ("three categories of alterations") is p3 prose, while for
+`01958` it says "the saliency-alignment framework's **figure** apply".
+
+### Where the measurable signal runs out
+
+I checked whether to convert the equation hedges into clean picks by dropping
+their `text_span` partners. Working it through: gold has one key per paper in 43
+of 55 validation questions, so a 2-paper question most likely has 2 gold items.
+Keeping the hedge is worth 0.767, dropping is worth 0.760 -- **indistinguishable**,
+so churning them would be motion without expected value. Same conclusion for the
+descriptor row keys, for a different reason: three failed forms of one such
+string is direct evidence the wording is not recoverable by paraphrase.
