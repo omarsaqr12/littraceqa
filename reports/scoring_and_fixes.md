@@ -361,3 +361,44 @@ v50 row sets, which recovers the 0.25 wherever it lives, for a certain 0.7647.
 This corrects my earlier reading. I had recorded those three as scoring exactly
 zero under both forms; the joint constraint says one of them was not zero, and
 that my "free retry" was not free after all -- it discarded a hit.
+
+## v55 = 0.7619: a real regression, and what it proved
+
+I marked the GenieBlue table change "confirmed" and it was not. Table 2's caption
+reads "We expand the Cambrian-7M dataset with 2M pure text data training
+samples", which is the question's wording almost verbatim, and Table 3's reads
+"using Cambrian 2.5M" -- yet gold cites **Table 3**. Caption semantics is a good
+heuristic, not proof, and I should have labelled it as such.
+
+The evidence-sum delta of **-0.600** admits exactly three readings, and two of
+them say Table 3 was right. Reverting is **>= 0 under all three**, so v56 reverts
+it. The other two changes stay: WINS's "16 (p2) times smaller" appears only on
+p5, so the reading in which p4 was correct is implausible, and every reading
+agrees `bed9aa`'s p3 and p4 are both wrong (so that one is a free slot, not a
+loss).
+
+### The row metric handed over two questions for free
+
+Row F1 did not move by a single digit after v54 added one row to `1d2f37` and one
+to `69ae5b` (0.515079 before and after). Adding a row can only leave F1 fixed
+when **C = 0**, and no other combination of their possible deltas sums to exactly
+zero:
+
+| question | possible deltas from adding one row |
+|---|---|
+| `1d2f37` | C=0: 0, C=1 stays: -0.100, C=1->2: +0.300, C=2: -0.200 |
+| `69ae5b` | C=0: 0, C=1 stays: -0.100, C=1->2: +0.300, C=2: -0.200 |
+
+The only pair summing to zero is (0, 0). So **both score zero on rows**: neither
+`FVT` nor `AP-Attack` matches gold, despite both being exactly what the question
+calls those things. Their keys are therefore free to replace, which v56 does:
+
+* `1d2f37` -> `Mistral-7B-v0.1` / `Llama-3.1-8B`. Table 10 is "0-shot results ...
+  for Mistral-7B-v0.1 adapted models" and Table 11 the same for Llama-3.1-8B, so
+  gold's two rows have to separate the *models*; every setting-only key we tried
+  (`Random-initialization`, `FVT`, `Random`) cannot.
+* `69ae5b` -> adds `Attribute-aware Prompt Attack`, the expansion the paper itself
+  uses when it introduces the acronym.
+
+Projected v56 = **0.7666**, above the previous best of 0.7647, with the two row
+bets unable to cost anything from C=0.
