@@ -705,3 +705,46 @@ has now missed in two different forms, which is direct evidence that grader-
 invented descriptor strings are not recoverable by paraphrase. My hit rate on
 inventing their wording is below the break-even, so adding candidate rows there
 would be adding noise, not expected value.
+
+## v51: two validation rules I had measured but never applied
+
+### Rule A -- gold rows == gold papers, 8 of 8
+
+Re-checked on validation: every multi-paper table question has exactly one gold
+row per paper -- (4,4) six times, (3,3), (9,9). No exceptions. Three of our
+questions emit more keys than they have papers, which caps them:
+
+| question | papers | our keys | cap |
+|---|---|---|---|
+| `9f1c90` | 2 | 4 | 0.667 |
+| `e9269a` | 2 | 4 | 0.667 |
+| `1d16eb` | 2 | 3 | 0.800 |
+
+But the cap is not the real point. If gold has exactly 2 rows, **gold's 2 keys
+cannot be 2 of our 4 quantity descriptors** -- a 2-row gold table cannot key its
+rows by four separate quantities. So these three score **0**, and replacing them
+with one identity-keyed row per paper is free with a 1.000 ceiling.
+
+### Rule B -- gold uses the paper's own labels
+
+Validation q_054 keyed its rows "w/ ground truth" / "w/ cube rcnn", the labels
+printed in the paper. Checking every table question's keys against its source
+turned up four mismatches:
+
+| question | ours | the paper prints |
+|---|---|---|
+| `3ad5f1` | `SciFact` ... | `Scifact+Fake2`, `HotpotQA+Fake2`, `NFCorpus+Fake2`, `Climate-FEVER+Fake2` (p13) |
+| `1d2f37` | `Random-initialization` | **`Random`** (p15, under "200 Training Steps") |
+| `a4bf90` | `Total image/annotation counts`, `Number of annotators` | Table 1's columns are `# Image` and `# Annotator` |
+| `69ae5b` | `subspace-alignment` | the title's `Subspaces Alignment` -- plural, unhyphenated, and the paper has no acronym at all |
+
+For these four the variants were **added**, not substituted. On `3ad5f1` that is
+the difference between a guaranteed 0.667 and a coin flip between 1.0 and 0 --
+and, more importantly, it guarantees the eight NDCG/MAP cells are scored under
+either convention, where guessing wrong would have zeroed them too.
+
+Also re-confirmed while checking: ConECT really does print "Offer titles" and
+"Product desc" as its column headers, and the Baseline row reads
+83.73 / 0.9227 / 70.76 / 0.9335 -- so `e721a5` was already right, rows and cells.
+EpicPRM p4 says "into 11 levels", confirming that value, and its Figure 2 is on
+p3 where we cite it.
