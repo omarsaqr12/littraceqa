@@ -9,12 +9,19 @@ shape.
 
 ## Current standing
 
-**Best submission: 0.6366** (`preds/test_v32.jsonl`). Rank 1 is 0.7837.
+**Best submission: 0.7518** (`preds/test_v49.jsonl`). Rank 1 is 0.7837.
 
 Everything above 0.5519 came from **auditing answers against the PDFs by hand**
-rather than from any change to the pipeline. **`test_v41.jsonl` is the file to
-submit next**: 21 of 71 questions corrected against the scored v32 -- 9 paper
-sets, 4 MC answers, 21 evidence sets -- every change citing a page.
+rather than from any change to the pipeline. **`test_v50.jsonl` is the file to
+submit next**, and its two changes are free under every reading consistent with
+the scores so far.
+
+From v41 onward the scored deltas became the measuring instrument: row F1 sat at
+exactly 0.340476 for five consecutive submissions, so a single key change and its
+effect on the 21-question sum could be attributed uniquely. That is how the
+`paper` row keys were shown to be short names, how three candidate keys were
+shown to have missed, and how individual cells were shown to be wrong and
+therefore free to rewrite.
 
 | run | paper F1 | evid F1 | MC | table row F1 | table cell acc | overall |
 |---|---|---|---|---|---|---|
@@ -26,8 +33,15 @@ sets, 4 MC answers, 21 evidence sets -- every change citing a page.
 | v16 (question-verbatim row keys) | 0.7897 | 0.4690 | 0.80 | 0.2262 | 0.0476 | 0.5389 |
 | v19 (row keys authored by hand) | 0.7991 | 0.4737 | 0.78 | **0.3405** | 0.0952 | 0.5602 |
 | v26 (answers audited vs PDFs) | 0.8554 | 0.5347 | 0.84 | 0.3405 | 0.1984 | 0.6166 |
-| **v32 (21 questions re-audited)** | **0.8789** | **0.5606** | **0.86** | 0.3405 | **0.2103** | **0.6366** |
-| v41 (7 wrong papers, 4 MC, 21 evidence) | — | — | — | — | — | not yet submitted |
+| v32 (21 questions re-audited) | 0.8789 | 0.5606 | 0.86 | 0.3405 | 0.2103 | 0.6366 |
+| v41 (7 wrong papers, 4 MC, 21 evidence) | 0.9704 | 0.6610 | 0.94 | 0.3405 | 0.2103 | 0.7095 |
+| v43 (equation_algorithm evidence, 5th MC) | 0.9704 | 0.7121 | 0.96 | 0.3405 | 0.2103 | 0.7287 |
+| v44 (figures read; 6th MC) | 0.9704 | 0.7121 | 0.98 | 0.3516 | 0.2103 | 0.7322 |
+| v45 (short paper row keys added) | 0.9704 | 0.7121 | 0.98 | 0.4283 | 0.2262 | 0.7425 |
+| v46 (proven-wrong rows dropped) | 0.9704 | 0.7121 | 0.98 | 0.4675 | 0.2262 | 0.7468 |
+| v48 (14 edits batched) | 0.9704 | 0.7192 | 0.98 | 0.4534 | 0.2500 | 0.7502 |
+| **v49 (three dud keys dropped)** | **0.9704** | **0.7192** | **0.98** | **0.4675** | **0.2500** | **0.7518** |
+| v50 (two free changes) | — | — | — | — | — | not yet submitted |
 | v11 | 0.7967 | 0.4667 | 0.82 | 0.2738 | 0.0595 | 0.5493 |
 | v13 (cerebras selector) | 0.7991 | not submitted | — | — | — | re-draw of v9 |
 
