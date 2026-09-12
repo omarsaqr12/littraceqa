@@ -11,7 +11,7 @@ looked plausible. Source-of-truth order used: evaluator output → submitted JSO
 Scripts written for this audit, both committed to the reproducibility package:
 
 * `results/validate_table3.py` — recomputes `overall` from official components
-  for all 23 scored submissions, with a derived (not guessed) rounding tolerance.
+  for every scored submission, with a derived (not guessed) rounding tolerance.
   Outputs `results/table3_validation.{csv,json}`.
 * `results/count_conventions.py` — recomputes all eight Table 2 support counts
   from the 55 dev examples and the cached PDFs, importing the evaluator's own key
@@ -32,7 +32,7 @@ audit was run with roughly 23 hours remaining.
 
 ### A1. Table 3, row 3 (`+ hand-authored table row keys`) — cell accuracy is wrong
 
-`validate_table3.py` over all 23 scored submissions: **22 consistent, 1 not.**
+`validate_table3.py` over all 23 submissions known at audit time: **22 consistent, 1 not.**
 
 | | shown | recomputed from shown components | diff | tolerance |
 |---|---|---|---|---|
@@ -277,7 +277,7 @@ claims check out against the implementation:
 | −0.25 long→short | ✓ `scoring_and_fixes.md:356` |
 | 0.129 ungated loss | ✓ `table_stage.md:201` |
 | break-even ~26% (not ~60%) once the cell term is counted | ✓ `table_stage.md:576` |
-| 22 of 23 submissions arithmetically consistent | ✓ this audit |
+| every submission arithmetically consistent except v19 | ✓ this audit; after the log arrived, 29 of 29 |
 | paper F1 rose 0.338 (0.6324→0.970423), evidence F1 0.373 (0.3587→0.731858) | ✓ (0.33802, 0.37316) |
 | test cell micro 31/87 for v57 | ✓ archived evaluator output |
 | A4, 8 pages | ✓ `pdfinfo` |
@@ -354,9 +354,9 @@ claims check out against the implementation:
 
 | finding | status |
 |---|---|
-| A1 `v19` cell accuracy | **Fixed.** Cell left empty; caption explains. `validate_table3.py` now reports 23 submissions, 22 fully checkable, **0 inconsistent**. |
+| A1 `v19` cell accuracy | **Resolved with the real value.** The evaluator submission log later became available and gives `table_cell_accuracy_macro: 0.103175`. Table 3 prints 0.1032. `validate_table3.py` now reports **29 submissions, 29 fully checkable, 0 inconsistent**. |
 | A2 `v48`/`v49` mislabel | **Fixed.** Both rows present with their own official values. |
-| A3 "sixteen scored submissions" | **Fixed.** 23 everywhere; Table 3 states its selection rule; Figure 2 plots all 23. |
+| A3 "sixteen scored submissions" | **Fixed, then corrected again.** 23 was also wrong: the evaluator log documents at least 29. The paper now states a lower bound and claims no total (see section 8). |
 | A4 Table 2 `43/55` | **Fixed.** 45/55 with the cardinality wording; 37/55 reported for the strict reading. |
 | A5 Figure 1 `0.7322` label | **Fixed.** Reads "evidence types, MC". |
 | A6 Figure 1 dev/test mixing | **Fixed.** Annotation marked *dev*; caption states the distinction. |
@@ -375,3 +375,49 @@ claims check out against the implementation:
 Two findings from the edit pass itself, both caught by `check_manuscript.py`
 rather than by reading: a stale "other six" after the table was rewritten, and a
 caption check broken by line re-wrapping. The checker is now whitespace-tolerant.
+
+---
+
+## 8. The evaluator submission log (received after the audit)
+
+The evaluator's own submission log was recovered after this audit was written and
+supersedes every lower-tier source. It is stored at `results/evaluator_log.csv`,
+and `results/official_scores.csv` is now derived from it.
+
+### What it settles
+
+* **`v19`'s cell accuracy is `0.103175`.** The audit inferred ~0.1032
+  algebraically from the reported overall and declined to print it, on the
+  grounds that an inference is not a transcription. The log confirms that
+  inference exactly. The paper now prints 0.1032 with the evaluator as its
+  source; the empty cell and its caption disclosure are gone.
+* **The metric formula is confirmed against 28 official outputs**, not one.
+  Every row in the log reproduces its own reported `overall` from its components
+  under `overall = (paper_f1 + evidence_f1 + (mc + row_f1 + cell_acc)/3)/3` to
+  within 1e-6. This is far stronger evidence for the claims in section 2 than the
+  single archived `v57` output the audit originally relied on. It doubles as a
+  check on the transcription: a typo in any component would break its own row.
+* **Every submission now carries full precision**, so the rounding tolerance for
+  each row drops to 5e-5 and `validate_table3.py` reports 29 of 29 checkable,
+  **0 inconsistent**.
+
+### What it unsettles
+
+* **The submission count.** The export is partial. It lists 28 distinct
+  submissions and omits `v55`, for which we hold an evaluator output, so at least
+  29 exist. The paper's "23" was wrong, and so was this audit's.
+* **The "17 that set a new best" selection rule** can no longer be asserted: a
+  submission missing from the export could have set a record between two visible
+  ones. Table 3's caption now describes its rows as the submissions marking each
+  distinct stage, plus the regression, and claims no completeness.
+* **Seven log entries have no counterpart in our own records**: four re-uploads
+  scoring 0.446198, one at 0.478734, one at 0.551929, and one genuine run at
+  `2026-08-18T04:17:17` (`12a3f0dbf380`, overall 0.541256, paper F1 0.777934,
+  MC 0.76) for which no local prediction file survives. The re-uploads are
+  identical by score; the last is a submission we had not recorded at all.
+
+### Still open
+
+Whether the export is complete enough to state an exact total. If the full log
+becomes available, the lower bound can become a count and the record-setter rule
+can be restored. Nothing else in the paper depends on it.

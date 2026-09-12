@@ -54,7 +54,7 @@ Each was edited separately.
 
 * **Figure 1** shortened; gained the sentence distinguishing test scores from the
   one `dev` annotation.
-* **Figure 2** shortened; now states its scope (all 23), what the shaded region
+* **Figure 2** shortened; now states its scope (the 29 documented runs), what the shaded region
   means, what the `v19` gap is, and that it is drawn from the CSV.
 * **Table 2** rewritten: names the generating script, defines rows 1 and 8, drops
   the unsupported "two largest jumps".

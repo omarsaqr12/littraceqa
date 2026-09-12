@@ -29,10 +29,12 @@ its three stated counts, checks all eight Table 2 counts against
 `results/convention_counts.json`, and checks that Figure 2 is still generated
 from the CSV with Type 42 fonts.
 
-`results/validate_table3.py` — **23 scored submissions, 22 fully checkable, 0
-inconsistent.** `v19` is reported as not checkable because one component was
-never retained. Before this audit the same script reported one inconsistency, at
-9.1x its rounding tolerance.
+`results/validate_table3.py` — **29 scored submissions, 29 fully checkable, 0
+inconsistent.** Before this audit the same script reported one inconsistency, at
+9.1x its rounding tolerance; the evaluator submission log supplied the missing
+component and it now reconciles exactly. Separately, all 28 rows of that log
+reproduce their own reported `overall` from their own components to within 1e-6,
+confirming the metric formula in section 2 against 28 official outputs.
 
 `results/count_conventions.py` — regenerates all eight Table 2 counts. Six
 reproduce the previously reported values exactly (8/8, 10/10, 3/3, 4/7, 52/68,
@@ -41,14 +43,12 @@ table questions.
 
 ## Claims that could not be independently verified
 
-1. **`v19`'s official cell accuracy.** Never transcribed from the evaluator; the
-   Space exposes no per-submission history. Its *overall* is sourced (commit
-   `83a78b7`), its paper F1, evidence F1 and MC are **proven** identical to `v9`
-   by a field-by-field diff of the two prediction files, and its row F1 is
-   recorded independently at `reports/table_stage.md:560`. Only the cell
-   accuracy is unavailable, and the paper now leaves it empty. A value of
-   ~0.1032 would reproduce the reported overall, but that is an inference from
-   the overall rather than an evaluator output, so it is not printed.
+1. **The exact number of submissions we made.** The evaluator log we were able
+   to export is partial: it documents 28 distinct submissions and omits `v55`,
+   for which we hold an evaluator output, so at least 29 exist. The paper states
+   that lower bound and claims no total. *(Resolved since the audit was written:
+   `v19`'s cell accuracy, previously listed here as unverifiable, is `0.103175`
+   in the log — exactly the value the audit had derived and declined to print.)*
 2. **The original `10/22/6` page-position triple.** The generating script was not
    preserved and no extraction rule tested reproduces it: item value plus
    evidence value gives (17, 61, 6) over 84; the item's own numeric value gives

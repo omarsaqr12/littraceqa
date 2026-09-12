@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Recompute the official `overall` from the official components of every scored
-submission and compare with the overall the evaluator reported.
+submission in `results/official_scores.csv` and compare with the overall the
+evaluator reported. That file is built from the evaluator's own submission log
+(`results/evaluator_log.csv`), which is the source of record.
+
+The log we were able to export is partial, so the row count here is a lower bound
+on how many submissions we made, not a total.
 
 The evaluator (scripts/evaluate.py) defines
 
@@ -47,14 +52,15 @@ report, bad = [], []
 incomplete = []
 for r in rows:
     shown = float(r["overall_shown"])
-    entry = dict(run=r["run"], file=r["file"], precision=r["precision"],
-                 overall_official=shown, provenance=r["provenance"])
+    entry = dict(run=r["run"] or "(unmapped)", submission_id=r["submission_id"],
+                 timestamp=r["timestamp"], precision=r["precision"],
+                 overall_official=shown, note=r["note"])
     missing = [k for k in ("paper_f1", "evidence_f1", "mc", "row_f1", "cell_acc")
                if not r[k].strip()]
     if missing:
         # A component the evaluator returned but we did not retain. The overall
         # is sourced; it simply cannot be recomputed. Never reconstruct it.
-        incomplete.append((r["run"], missing))
+        incomplete.append((r["run"] or r["submission_id"], missing))
         entry.update({k: (float(r[k]) if r[k].strip() else None)
                       for k in ("paper_f1", "evidence_f1", "mc", "row_f1", "cell_acc")})
         entry.update(overall_recomputed=None, difference=None, tolerance=None,
@@ -68,7 +74,7 @@ for r in rows:
     diff = rec - shown
     ok = abs(diff) <= tol
     if not ok:
-        bad.append(r["run"])
+        bad.append(r["run"] or r["submission_id"])
     entry.update(paper_f1=p, evidence_f1=e, mc=mc, row_f1=ro, cell_acc=c,
                  overall_recomputed=round(rec, 8), difference=round(diff, 8),
                  tolerance=round(tol, 8), consistent=ok, missing_components=[])
@@ -100,7 +106,7 @@ for d in report:
     if d["consistent"] is False:
         print(f"  {d['run']}: |diff| = {abs(d['difference']):.6f} "
               f"= {abs(d['difference'])/d['tolerance']:.1f}x its rounding tolerance")
-        print(f"       provenance: {d['provenance']}")
+        print(f"       note: {d['note']}")
 
 (HERE / "table3_validation.json").write_text(json.dumps(report, indent=1) + "\n")
 with open(HERE / "table3_validation.csv", "w", newline="") as fh:

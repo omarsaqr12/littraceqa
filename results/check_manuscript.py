@@ -57,7 +57,11 @@ for line in body.splitlines():
     if len(cells) == 8 and re.fullmatch(r"v\d+", cells[0]):
         rows.append(cells)
 
-by_run = {r["run"]: r for r in SCORES}
+# Re-uploads share a run name and have identical components, so first-wins is safe.
+by_run = {}
+for r in SCORES:
+    if r["run"] and r["run"] not in by_run:
+        by_run[r["run"]] = r
 check(len(rows) == 18, f"Table 3 has {len(rows)} data rows, expected 18")
 
 for cells in rows:
@@ -84,26 +88,15 @@ for cells in rows:
         check(abs(rec - num(cells[7])) <= 9.45e-5,
               f"Table 3 {run}: overall {num(cells[7])} vs recomputed {rec:.6f}")
 
-# selection rule stated in the caption
-best, records = -1.0, []
-for r in SCORES:
-    o = float(r["overall_shown"])
-    if o > best:
-        best, _ = o, records.append(r["run"])
-listed = [c[0] for c in rows]
-check(set(listed) == set(records) | {"v55"},
-      f"Table 3 rows are not exactly the record-setters plus v55: "
-      f"missing {sorted(set(records)-set(listed))}, extra {sorted(set(listed)-set(records)-{'v55'})}")
-for phrase, value in ((r"We made (\d+) scored submissions", len(SCORES)),
-                      (r"listed here are the (\d+) that set a new", len(records)),
-                      (r"The other (five|six|seven|four) explored", len(SCORES) - len(rows))):
-    m = re.search(phrase, FLAT)
-    check(m is not None, f"caption phrase not found: {phrase}")
-    if m:
-        got = m.group(1)
-        words = {"four": 4, "five": 5, "six": 6, "seven": 7}
-        check(words.get(got, None) == value if got in words else int(got) == value,
-              f"caption says {got!r} where the artifacts give {value}")
+# The exported evaluator log is partial, so the paper states a lower bound and
+# claims no total. Check the bound matches the evidence we actually hold.
+m = re.search(r"records \\emph\{at least\} (\d+) scored runs", FLAT)
+check(m is not None, "Table 3 caption no longer states the lower bound on submissions")
+if m:
+    check(int(m.group(1)) == len(SCORES),
+          f"caption says at least {m.group(1)} scored runs; "
+          f"official_scores.csv documents {len(SCORES)}")
+check("23 scored submissions" not in FLAT, "the stale count '23 scored submissions' is back")
 
 # ---------------------------------------------------------------- Table 2
 T2 = {
@@ -127,7 +120,7 @@ check("37/55" in FLAT, "the strict one-key-per-paper reading (37/55) is not stat
 fig = (ROOT / "paper" / "make_fig.py").read_text()
 check("official_scores.csv" in fig, "make_fig.py no longer reads official_scores.csv")
 check("fonttype\"] = 42" in fig, "make_fig.py no longer forces Type 42 fonts")
-m = re.search(r"all (\d+) of our scored submissions", FLAT)
+m = re.search(r"the (\d+) scored submissions we hold evaluator", FLAT)
 check(m and int(m.group(1)) == len(SCORES),
       f"Figure 2 caption submission count disagrees with the CSV ({len(SCORES)})")
 

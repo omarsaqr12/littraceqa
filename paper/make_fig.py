@@ -30,11 +30,17 @@ def val(r, k):
 
 
 x = list(range(1, len(rows) + 1))
-labels = [r["run"] for r in rows]
+# label a run on its first appearance only: the repeats are re-uploads of an
+# identical file, and one submission has no surviving local prediction file.
+labels, seen = [], set()
+for r in rows:
+    name = r["run"]
+    labels.append(name if name and name not in seen else "")
+    seen.add(name)
 
 # first submission carrying a per-question intervention: everything before it is
 # the fully automated pipeline.
-first_manual = labels.index("v19") + 1
+first_manual = [i for i, r in enumerate(rows, 1) if r["run"] == "v19"][0]
 
 fig, ax = plt.subplots(figsize=(7.1, 2.78))
 series = [
@@ -50,8 +56,8 @@ for label, key, colour, marker, dash, weight in series:
 ax.plot(x, [val(r, "overall_shown") for r in rows], marker="o", ms=4.2, lw=2.3,
         color="black", label="overall", zorder=5)
 
-i9 = labels.index("v9") + 1
-i55 = labels.index("v55") + 1
+i9 = [i for i, r in enumerate(rows, 1) if r["run"] == "v9"][0]
+i55 = [i for i, r in enumerate(rows, 1) if r["run"] == "v55"][0]
 ax.annotate("best fully automated\n0.5519", xy=(i9, 0.5519), xytext=(i9 + 1.1, 0.655),
             fontsize=6.5, ha="left",
             arrowprops=dict(arrowstyle="->", lw=0.7, color="0.35"))

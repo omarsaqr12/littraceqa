@@ -7,11 +7,11 @@ look right. Audit that produced this list: `reports/camera_ready_audit.md`.
 
 | # | change | evidence |
 |---|---|---|
-| 1 | **Table 3, `v19` cell accuracy `0.0952` removed**, cell left empty | The value was never transcribed from the evaluator; it was assumed equal to `v9`. That assumption is invalid because `table_metrics` gates cell accuracy on row-key matching and `v19` changed row keys on 3 questions. The row was inconsistent at 9.1x its rounding tolerance. The true value is not recoverable, so nothing replaces it. |
+| 1 | **Table 3, `v19` cell accuracy `0.0952` -> `0.1032`** | The old value was never transcribed from the evaluator; it was assumed equal to `v9`, which is invalid because `table_metrics` gates cell accuracy on row-key matching and `v19` changed row keys on 3 questions. The row was inconsistent at 9.1x its rounding tolerance. The evaluator submission log gives `table_cell_accuracy_macro: 0.103175`, matching the value the audit had derived algebraically and declined to print. |
 | 2 | **`v48` added to Table 3**; the `+ batched cell rewrites` line corrected to `v48`'s values | The line carried `v49`'s numbers (row 0.4675, overall 0.7518) under a label describing `v48`'s change. `v48` is row 0.453401, overall 0.7502 (`results/official_scores.csv`, evaluator JSON). `v49` now has its own line. |
 | 3 | **`v6` added to Table 3** | `v6` set a new best (0.4787) and was missing, which made the stated selection rule false. |
-| 4 | **"sixteen scored submissions" corrected to 23** in the Figure 2 caption and in §2 | 23 submissions were scored. Table 3 now states its selection rule (17 record-setters plus the one regression) and says five are omitted. |
-| 5 | **Figure 2 redrawn with all 23 submissions**, labelled by run | The old figure showed a curated 16 while its caption claimed completeness. |
+| 4 | **"sixteen scored submissions" removed; no total claimed** | 16 was wrong and so was 23. The evaluator log documents at least 29 scored runs and is a partial export, so Table 3 states a lower bound and describes its rows as the submissions marking each distinct stage, plus the regression. |
+| 5 | **Figure 2 redrawn with the 29 documented submissions** | The old figure showed a curated 16 while its caption claimed completeness. Ticks are labelled on a first appearance only, so the re-upload plateaus are visible rather than hidden. |
 | 6 | **Table 2 row 1: `43/55` -> `45/55`**, wording changed to "Distinct evidence keys $=$ gold paper count" | `results/count_conventions.py`: the cardinality reading gives 45/55 and matches the paper's own histogram (24+19+1+1); the strict bijective reading gives 37/55. `43/55` matches neither and appears to have been transcribed from `reports/paper_selection.md:73`, where it is an unrelated paper-selection accuracy. Both readings are now reported. |
 | 7 | **Table 2 row 7 relabelled** "same-page `table`" | The count 1/64 is correct but 64 is the number of gold *table* items. Over all object types it is 5/95. |
 | 8 | **Table 2 row 8: `10/38` -> `17/84`**, definition stated | The original triple (10/22/6) came from a script that was not preserved and no extraction rule reproduces it. Replaced with a figure the shipped script regenerates. The conclusion is unchanged: gold is the earliest occurrence in a minority of cases under every rule tested. |
@@ -58,6 +58,7 @@ See `reports/camera_ready_style_changelog.md`.
 ## New scripts (all in `results/`)
 
 * `count_conventions.py` — regenerates all eight Table 2 counts from the 55 dev examples.
-* `validate_table3.py` — recomputes `overall` for all 23 submissions against a derived tolerance.
+* `validate_table3.py` — recomputes `overall` for all 29 documented submissions against a derived tolerance.
+* `evaluator_log.csv` — the evaluator's own submission log, the source of record for every score.
 * `check_manuscript.py` — 154 checks of the manuscript against those artifacts.
 * `official_scores.csv` — every scored submission with its provenance.
