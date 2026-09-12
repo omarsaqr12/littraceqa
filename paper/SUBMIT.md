@@ -21,7 +21,7 @@ OdeD
 | name | email | affiliation |
 |---|---|---|
 | Omar Saqr | `omar_saqr@aucegypt.edu` | The American University in Cairo |
-| Mostafa Gafaar | `mostafa21314@aucegypt.edu` | The American University in Cairo |
+| Mostafa Gaafar | `mostafa21314@aucegypt.edu` | The American University in Cairo |
 
 **Abstract** --- paste from `paper/openreview_abstract.txt` (plain text, no LaTeX)
 

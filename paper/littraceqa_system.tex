@@ -22,7 +22,7 @@ Reading the Scorer for Literature-Grounded QA}
 \author{Omar Saqr \\
   The American University in Cairo \\
   \texttt{omar\_saqr@aucegypt.edu} \\\And
-  Mostafa Gafaar \\
+  Mostafa Gaafar \\
   The American University in Cairo \\
   \texttt{mostafa21314@aucegypt.edu}}
 
@@ -32,49 +32,50 @@ Reading the Scorer for Literature-Grounded QA}
 \begin{abstract}
 We describe team \textbf{OdeD}'s submission to LitTraceQA, the
 literature-grounded question answering task at GroundLM 2026. The task scores
-three coupled outputs --- paper identifiers, coarse evidence locators, and
-answers in multiple-choice or table form --- and our best official score on the
-71-question held-out test split is \textbf{0.7649}, against \textbf{0.4563} for
-our first submission and \textbf{0.5519} for our best fully automated one.
-Almost none of the improvement came from the retrieval-and-reading pipeline we
-began with. It came from two other places. First, we read the released evaluator
-and found the metric is far more asymmetric than it looks: paper F1 and evidence
-F1 carry weight $1/3$ each while each of the three answer metrics carries only
-$1/9$, and the evidence key is a coarse tuple in which a correct value on a
-correct page still scores zero if the \emph{source type} or the visible object id
-is wrong. Second, we treated the 55-example development split as a corpus for
-recovering the dataset's \emph{annotation conventions} rather than as a
-validation set for tuning, and we treated our own submission history as a
-measuring instrument: because each macro metric is a mean of a small number of
-rational per-question values, a controlled change to one prediction file often
-admits exactly one arithmetic explanation. Two of our predicted deltas came back
-exact to four decimals. We report the conventions this recovered, six heuristics
-it refuted, four bugs it exposed in our own verifiers, and the limitation that a
-large share of our final score reflects per-question auditing and
-leaderboard-feedback attribution rather than a system that would generalise.
+three coupled outputs: paper identifiers, coarse evidence locators, and answers
+in multiple-choice or table form. Our best official score on the 71-question
+held-out test split is \textbf{0.7649}, against \textbf{0.4563} for our first
+submission and \textbf{0.5519} for our best fully automated one. Little of that
+improvement came from the retrieval-and-reading pipeline we began with; most of
+it came from two other sources. Reading the released evaluator showed the metric
+to be more asymmetric than it appears: paper F1 and evidence F1 carry weight
+$1/3$ each while each of the three answer metrics carries $1/9$. The evidence key
+is also a coarse tuple, so a correct value on a correct page scores zero when the
+\emph{source type} or the visible object id is wrong. The 55-example development split then served to recover the dataset's
+\emph{annotation conventions} rather than as a tuning set, and our own submission
+history became a measuring instrument. Each macro metric is a mean of a small
+number of rational per-question values, so a controlled change to one prediction
+file often admits a single arithmetic explanation. Two predicted deltas returned exact to four
+decimals. We report the conventions this recovered, six heuristics it refuted,
+four bugs it exposed in our own verifiers, and the limitation that much of our
+final score reflects per-question auditing and leaderboard feedback rather than a
+system that would generalise.
 \end{abstract}
 
 \section{Introduction}
 
-LitTraceQA asks a system to answer a research question by returning three things
-at once: the canonical identifiers of the paper or papers involved, coarse
-evidence locations inside those papers, and the answer in a requested format.
-Because these are scored separately, a system can be visibly right for the wrong
-reasons --- a correct multiple-choice answer attached to the wrong paper, or the
-right paper with a locator pointing at the wrong page.
+LitTraceQA \citep{liu2026littraceqabenchmarkmultistagegrounding} asks a system to
+answer a research question by returning three things at once: the canonical
+identifiers of the paper or papers involved, coarse evidence locations inside
+those papers, and the answer in a requested format. Because these are scored
+separately, a system can be visibly right for the wrong reasons: a correct
+multiple-choice answer attached to the wrong paper, or the right paper with a
+locator pointing at the wrong page. It is one of the two GroundLM 2026 shared
+tasks, alongside GoldenViewVQA \citep{wang2026doesanswercomefrom}, which asks the
+same provenance question of multi-view driving scenes; we entered LitTraceQA
+only. \citet{wang-etal-2026-groundlm} report the tasks and the participating
+systems.
 
-Our participation had an unusual shape and we state it plainly. We built a
-conventional pipeline --- dense retrieval over the released metadata pool,
-cross-encoder reranking, an LLM selector, and a vision-capable reader for tables
-and figures --- it reached an official $0.4563$, improved to $0.5519$ with
-selection and visual reading, and then stopped. Every subsequent gain, to
-$0.7649$, came from work better described as \emph{instrument reading} than as
-modelling: studying the scorer, recovering the annotators' conventions from the
-development split, and using controlled submissions to identify which individual
-predictions were wrong.
-
-We believe the findings are more transferable than our architecture, so the paper
-is organised around them.
+Our participation had an unusual shape. We built a conventional pipeline: dense
+retrieval over the released metadata pool, cross-encoder reranking, an LLM
+selector, and a vision-capable reader for tables and figures. It reached an
+official $0.4563$, improved to $0.5519$ with selection and visual reading, and
+then stopped. Every subsequent gain, to $0.7649$, came from work better described
+as \emph{instrument reading} than as modelling: studying the scorer, recovering
+the annotators' conventions from the development split, and using controlled
+submissions to identify which individual predictions were wrong. The findings
+seem more transferable than our architecture, so the paper is organised around
+them.
 
 \paragraph{Contributions.}
 \begin{enumerate}\itemsep1pt
@@ -83,15 +84,15 @@ score is \emph{provenance} rather than answering, and that the set-based evidenc
 and table metrics make the cost of hedging exactly computable
 (\S\ref{sec:metric}).
 \item Eight annotation conventions recovered from 55 development examples, each
-reported with the count it rests on, including two that transferred to test and
-produced our largest single jumps (\S\ref{sec:conventions}).
-\item \emph{Score-guided attribution}: using a macro metric over a small test set
+reported with the count it rests on, and the two we acted on directly in test
+submissions (\S\ref{sec:conventions}).
+\item \emph{Score-guided attribution}: using a macro metric over a small test split
 to prove an individual prediction right or wrong, with two predicted deltas
 confirmed exactly (\S\ref{sec:attribution}).
 \item Six negative results and four bugs in our own instrumentation, reported so
 that others do not repeat them (\S\ref{sec:negative}).
 \item An error taxonomy for grounded scientific QA in which the dominant failure
-is not hallucination but \emph{the right paper and the wrong row}
+is \emph{the right paper and the wrong row} rather than hallucination
 (\S\ref{sec:errors}).
 \end{enumerate}
 
@@ -122,35 +123,38 @@ is not hallucination but \emph{the right paper and the wrong row}
 \draw[ar] (sub.south) |- (fb.east);
 \draw[ar] (fb.north) -- (ver.south);
 
-\node[note, anchor=north] at (2.05,-0.62) {paper F1\\$0.410\!\to\!0.490$};
+\node[note, anchor=north] at (2.05,-0.62) {paper F1 \emph{(dev)}\\$0.410\!\to\!0.490$};
 \node[note, anchor=north] at (4.15,-0.62) {$\le\!3$ papers};
 \node[note, anchor=north] at (6.20,-0.62) {text $+$ raster};
 \node[gain, anchor=south] at (3.10,0.52)  {$0.4563 \to 0.5519$};
 \node[gain, anchor=south] at (7.60,0.52)  {$\to 0.7095$\\{\scriptsize 7 wrong papers}};
-\node[gain, anchor=south] at (11.75,0.52) {$\to 0.7322$\\{\scriptsize evidence types}};
+\node[gain, anchor=south] at (11.75,0.52) {$\to 0.7322$\\{\scriptsize evidence types, MC}};
 \node[gain, anchor=east]  at (8.85,-1.75) {$\to 0.7649$\\{\scriptsize row keys, cells}};
 \end{tikzpicture}
 \caption{Our system and where each stage moved the official score. The unshaded
-path left to right is the pipeline, which plateaued at $0.5519$. The two shaded
-boxes are what actually produced the rest: a verification pass that checks every
-prediction against the source PDF, and a feedback loop in which the evaluator's
-macro metrics are decoded arithmetically to identify \emph{which} individual
-predictions are wrong (\S\ref{sec:attribution}) before the next submission.
-Figure~\ref{fig:progress} gives the per-component detail.}
+left-to-right path is the pipeline, which plateaued at $0.5519$. The two shaded
+boxes produced the rest: a verification pass that checks every prediction against
+the source PDF, and a feedback loop in which the evaluator's macro metrics are
+decoded arithmetically to identify \emph{which} individual predictions are wrong
+(\S\ref{sec:attribution}). Every score is an official test score except the
+retrieval annotation marked \emph{dev}, a development-set ablation of the
+reranker.}
 \label{fig:pipeline}
 \end{figure*}
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{progress.pdf}
-\caption{Official evaluator score for each of our sixteen scored submissions, in
-submission order. The shaded region is the pipeline; everything after it is the
-audit loop and score-guided attribution. The two components weighted $1/3$
-(paper F1, evidence F1) account for almost all of the movement, while the two
-table components weighted $1/9$ stall around $0.30$--$0.50$ and hold most of our
-remaining headroom. Submission 15 is the one that regressed: we had labelled a
+\caption{Official evaluator score for all 23 of our scored submissions, in order
+and labelled by run. The shaded region is the fully automated pipeline; from
+\texttt{v19} onwards every submission involves per-question intervention. The two
+components weighted $1/3$ account for almost all of the movement, while the two
+table components weighted $1/9$ stall between $0.05$ and $0.52$ and hold most of
+our remaining headroom. \texttt{v55} regressed: we had labelled a
 caption-semantics inference ``confirmed'' when it was a heuristic, and reverting
-it returned exactly the $+1.0$ of evidence sum the arithmetic predicted.}
+it returned exactly the $+1.0$ of evidence sum the arithmetic predicted. The gap
+at \texttt{v19} is a component we did not retain (Table~\ref{tab:results}). Drawn
+from \texttt{results/official\_scores.csv}.}
 \label{fig:progress}
 \end{figure*}
 
@@ -165,14 +169,13 @@ The released evaluator computes
 \text{overall} = \tfrac{1}{3}\left(\text{paper\_f1} + \text{evidence\_f1} + \text{answer}\right)
 \]
 so paper F1 and evidence F1 carry weight $1/3$ each, while multiple-choice
-accuracy, table row F1 and table cell accuracy carry $1/9$ each. This is the
-single most consequential fact about the task and it is easy to miss: an
-intuition that answer accuracy is the objective puts effort in the wrong place.
-On our first submission multiple-choice accuracy was already $0.68$ while
-evidence F1 was $0.3587$. Figure~\ref{fig:pipeline} gives the system and where each stage moved the
-score; Figure~\ref{fig:progress} shows how the components moved across all
-sixteen of our submissions, and
-Table~\ref{tab:example} gives one question end to end.
+accuracy, table row F1 and table cell accuracy carry $1/9$ each. Treating answer
+accuracy as the objective therefore puts effort in the wrong place. On our first
+submission multiple-choice accuracy was already $0.68$ while evidence F1 was
+$0.3587$. Figure~\ref{fig:pipeline} gives the system and where each stage moved the
+score; Figure~\ref{fig:progress} shows how the components moved across all 23 of
+our scored submissions, and Table~\ref{tab:example} gives one question end to
+end.
 
 \paragraph{Evidence keys are coarse.}
 Predictions and gold are compared as sets of tuples
@@ -200,7 +203,7 @@ when fine-tuned on Cambrian~7M plus an extra 2M pure-text samples\ldots?''}\\[2p
 \texttt{answer.multiple\_choice.gold}: \texttt{B} \\[3pt]
 \emph{Page 3 carries both Table~2 (``expand the Cambrian-7M dataset with 2M pure
 text data'') and Table~3 (``using Cambrian 2.5M''). The question's wording matches
-Table~2 almost verbatim --- and gold cites \textbf{Table~3}. Choosing Table~2 cost
+Table~2 almost verbatim, and gold cites \textbf{Table~3}. Choosing Table~2 cost
 a full $1.0$ of evidence F1 on this one question, because
 \texttt{object\_id} is part of the key.}\\
 \bottomrule
@@ -216,7 +219,7 @@ Row F1 is a set F1 over row-key tuples, so duplicate row keys silently collapse
 in the evaluator's dictionary. Cell accuracy iterates over \emph{gold} rows only:
 cells in a predicted row whose key does not match gold are never examined, and
 unmatched gold rows count their cells as wrong. Cell accuracy is therefore
-bounded by row \emph{recall} and indifferent to row precision --- an extra
+bounded by row \emph{recall} and indifferent to row precision: an extra
 candidate row can cost row F1 but can never cost cell accuracy. Including this
 term moves the break-even hit rate for adding a candidate row from about 60\% to
 \textbf{26\%}, which changed several of our decisions.
@@ -232,10 +235,10 @@ selector that returns indices. Reranking moved paper F1 from $0.410$ to $0.490$
 on a development family; the LLM selector with a cap of three papers per question
 was our best configuration.
 
-We measured shortlist recall separately to locate the bottleneck: on a test-like
-development family, recall of the gold paper was $0.846$ at rank 1 and $0.962$ at
-rank 20, and \emph{flat} out to rank 200. Widening the shortlist was therefore
-pointless and we did not pursue it.
+Shortlist recall, measured separately to locate the bottleneck, is not the
+constraint: on a test-like development family, recall of the gold paper was
+$0.846$ at rank 1 and $0.962$ at rank 20, and \emph{flat} out to rank 200.
+Widening the shortlist was therefore pointless and we did not pursue it.
 
 \paragraph{Reading.}
 Selected PDFs are read locally with PyMuPDF for page text, caption indices and
@@ -261,7 +264,7 @@ interpreting our score, and we return to it in \S\ref{sec:limitations}.
 \label{sec:conventions}
 
 The development split has 55 examples with gold papers, evidence and answers. As
-a validation set for tuning it is too small to separate configurations. As a
+a tuning set it is too small to separate configurations. As a
 corpus describing \emph{how the annotators behaved} it was the most valuable
 resource in the task. Table~\ref{tab:conventions} collects the conventions with
 their denominators, because several rest on small samples and a reader should see
@@ -274,31 +277,39 @@ that rather than take them on trust.
 \toprule
 Convention (counted on 55 dev questions) & support \\
 \midrule
-Exactly one evidence key per gold paper            & 43/55 \\
+Distinct evidence keys $=$ gold paper count        & 45/55 \\
 Gold table rows $=$ gold paper count (multi-paper) & \textbf{8/8} \\
 Question names a figure $\Rightarrow$ gold has \texttt{figure} & \textbf{10/10} \\
 Question names a table $\Rightarrow$ gold has \texttt{table}   & 3/3 \\
 Asks an equation/loss $\Rightarrow$ gold has \texttt{equation\_algorithm} & 4/7 \\
 Cited page carries a table caption $\Rightarrow$ gold type is \texttt{table} & 52/68 \\
-Gold pairs a \texttt{text\_span} with a same-page object & 1/64 \\
-Gold page is the \emph{earliest} occurrence of the value & 10/38 \\
+Gold pairs a \texttt{text\_span} with a same-page \texttt{table} & 1/64 \\
+Gold page is the \emph{earliest} occurrence of the value & 17/84 \\
 \bottomrule
 \end{tabular}
-\caption{Conventions recovered from the development split. Rows 2--3 transferred
-to test and produced our two largest jumps. The last two are why we did
+\caption{Conventions recovered from the development split, recomputed for this
+version by \texttt{results/count\_conventions.py}. Row 1 counts questions whose
+number of distinct evidence keys equals their number of gold papers; the
+stricter reading, one key per paper with no paper left uncited, holds for 37/55.
+Row 8 counts gold items whose value occurs on more than one page of the cited
+paper. Rows 2 and 3 were the conventions we acted on directly in test
+submissions (\S\ref{sec:conventions}). The last two rows are why we did
 \emph{not} ship a positional page-rewrite rule or a same-page
 \texttt{text\_span} pad.}
 \label{tab:conventions}
 \end{table}
 
-\paragraph{One evidence key per paper.}
+\paragraph{Evidence keys match the gold paper count.}
 Distinct evidence keys versus gold papers gives $(1,1)$ 24 times, $(4,4)$ 19
-times, plus $(3,3)$ and $(9,9)$. Gold evidence is provenance \emph{per paper},
-not an exhaustive list of supporting locations, and we sized our evidence sets
-accordingly.
+times, plus $(3,3)$ and $(9,9)$, so the counts agree on 45 of 55 questions. On 37
+the mapping is strictly one key per paper; the eight remaining are four-paper
+questions where one paper carries two keys and one is cited by none. Gold evidence
+is provenance \emph{per paper}, not an exhaustive list of supporting locations,
+and we sized our evidence sets accordingly.
 
 \paragraph{Source type follows the question's wording.}
-Conditioning gold's type on the question's vocabulary is strikingly predictive
+Conditioning gold's source type on the question's vocabulary is predictive on
+the development split, though on small denominators
 (Table~\ref{tab:conventions}). Acting on it produced our largest evidence gain:
 we had been emitting \emph{no} \texttt{equation\_algorithm} items at all, and
 adding them alongside \texttt{text\_span} on six equation-form questions
@@ -310,7 +321,7 @@ where committing to one scores $0.4$ in expectation at $P(\text{equation})=0.6$.
 
 \paragraph{Gold table rows equal gold paper count.}
 Every multi-paper table question in the development split has exactly one gold
-row per paper --- 8 of 8, no exceptions. This does more than cap row F1. If gold
+row per paper (8 of 8, no exceptions). This does more than cap row F1: if gold
 has two rows, then gold's two keys \emph{cannot} be two of our four quantity
 descriptors, because a two-row table cannot key its rows by four separate
 quantities. Three of our test predictions violated the constraint and were, by
@@ -319,10 +330,10 @@ that argument, scoring zero.
 \paragraph{Row keys reproduce printed labels.}
 Where a question names entities, gold keys are those names lowercased, keeping
 qualifying parentheticals. Where it implies variants of one paper, gold uses the
-labels \emph{printed in that paper's own table} --- one development question keys
+labels \emph{printed in that paper's own table}. One development question keys
 its rows \texttt{w/ ground truth} and \texttt{w/ cube rcnn}. Checking every test
-row key against its source this way found four mismatches, the decisive one being
-a retrieval question whose gold keys carry the paper's \texttt{+Fake2} suffix
+row key against its source this way found four mismatches. The largest was a
+retrieval question whose gold keys carry the paper's \texttt{+Fake2} suffix
 rather than the bare dataset names we had used. Correcting it took that question
 from row F1 $0$ to $1.0$ and cell accuracy $0$ to $1.0$ in a single step. We
 \emph{added} the variants rather than substituting them, which is what guaranteed
@@ -332,10 +343,10 @@ wrong bet would have zeroed them too.
 \paragraph{Evidence pages are not the first mention.}
 Gold's page histogram peaks at pages 6--7 (65 of 149 items) with only 5 of 149 on
 page 1, while our predictions put 40\% of their items on pages 1--3. The obvious
-correction is nevertheless wrong: among gold items whose value appears on more
-than one page, gold is the earliest occurrence 10 times, in the middle 22 times,
-and the latest 6 times. There is no positional rule to learn, only a semantic
-one. We used the statistic to triage items for manual review and did not ship it
+correction is nevertheless wrong: among the 84 gold items whose value appears on
+more than one page of the cited paper, gold is the earliest occurrence 17 times,
+somewhere in the middle 61 times, and the latest 6 times. There is no positional rule to learn, only a semantic
+one. The statistic served to triage items for manual review; it was never shipped
 as a rewrite.
 
 \section{Score-Guided Attribution}
@@ -348,14 +359,14 @@ feedback identifies \emph{which} predictions are wrong rather than merely whethe
 the file improved.
 
 \paragraph{Worked example.}
-Table row F1 sat at exactly $0.340476$ for five consecutive submissions. When two
-questions' row keys were changed and the macro moved by $+0.011111$ --- that is
-$+0.2333$ over the 21-question sum --- the shift decomposed uniquely as one
-question going from zero matched rows to one while its row count went from 2 to 4
-($2{\cdot}1/6 - 0 = +0.3333$) and a second question's added candidate missing
-($2{\cdot}1/5 - 2{\cdot}1/4 = -0.1$). That established both that gold's
-\texttt{paper} row keys are short names rather than full metadata titles, and
-that one specific candidate string was wrong.
+Table row F1 sat at exactly $0.340476$ for five consecutive submissions.
+Changing two questions' row keys then moved the macro by $+0.011111$, or
+$+0.2333$ over the 21-question sum. That shift decomposes uniquely: one question went from
+zero matched rows to one while its row count went from 2 to 4
+($2{\cdot}1/6 - 0 = +0.3333$), and a second question's added candidate missed
+($2{\cdot}1/5 - 2{\cdot}1/4 = -0.1$). This established that gold's \texttt{paper}
+row keys are short names rather than full metadata titles, and that one specific
+candidate string was wrong.
 
 \paragraph{Reading exact fractions.}
 \texttt{table\_cell\_accuracy\_micro} is $\textit{cell\_correct}/\textit{cell\_total}$
@@ -367,9 +378,9 @@ the 21 table questions, and the $+8$ was one question's eight cells.
 Two predictions made before submitting came back exact. Dropping rows proven not
 to match was predicted at $+0.2952$ over the row sum and returned $+0.2952$;
 restoring three row sets was predicted at $+0.2500$ and returned $+0.2500$. A
-third prediction was wrong by $-0.25$, and because three of the changed questions
-had identical key sets before and after --- so their contributions had to cancel
---- the shortfall forced the conclusion that a change we had reasoned was
+third prediction was wrong by $-0.25$. Three of the changed questions had
+identical key sets before and after, so their contributions had to cancel; the
+shortfall therefore forced the conclusion that a change we had reasoned was
 ``free'' had discarded a matching key. We reverted it and recovered the exact
 amount.
 
@@ -379,7 +390,7 @@ question has $C=0$ its row F1 is zero for any $N$, so replacing its keys is free
 Row F1 was unchanged to six decimals after we added one row to each of two
 questions; adding a row can only leave F1 fixed when $C=0$, and no other
 combination of their possible deltas sums to exactly zero. Both therefore score
-zero on rows --- meaning \texttt{FVT} and \texttt{AP-Attack} do not match gold
+zero on rows, meaning \texttt{FVT} and \texttt{AP-Attack} do not match gold
 \emph{despite being exactly what the question calls those things}.
 
 \paragraph{Disclosure.}
@@ -399,36 +410,44 @@ diagnostic track.
 
 \begin{table*}[t]
 \centering\small
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{llrrrrrr}
 \toprule
-Submission & paper F1 & evid.\ F1 & MC & row F1 & cell acc & \textbf{overall} \\
+run & Submission & paper F1 & evid.\ F1 & MC & row F1 & cell acc.\ (macro) & \textbf{overall} \\
 \midrule
-initial pipeline                          & 0.6324 & 0.3587 & 0.68 & 0.3221 & 0.1310 & 0.4563 \\
-\;+ LLM selector, visual table reading    & 0.7991 & 0.4737 & 0.78 & 0.2738 & 0.0952 & \textbf{0.5519} \\
-\;+ hand-authored table row keys          & 0.7991 & 0.4737 & 0.78 & 0.3405 & 0.0952 & 0.5602 \\
-\;+ answer audit against the PDFs         & 0.8554 & 0.5347 & 0.84 & 0.3405 & 0.1984 & 0.6166 \\
-\;+ audit continued                       & 0.8789 & 0.5606 & 0.86 & 0.3405 & 0.2103 & 0.6366 \\
-\;+ seven paper-set corrections           & 0.9704 & 0.6610 & 0.94 & 0.3405 & 0.2103 & 0.7095 \\
-\;+ \texttt{equation\_algorithm} evidence & 0.9704 & 0.7121 & 0.96 & 0.3405 & 0.2103 & 0.7287 \\
-\;+ figure-counting answers               & 0.9704 & 0.7121 & 0.98 & 0.3516 & 0.2103 & 0.7322 \\
-\;+ short-name table row keys             & 0.9704 & 0.7121 & 0.98 & 0.4283 & 0.2262 & 0.7425 \\
-\;$-$ rows proven not to match            & 0.9704 & 0.7121 & 0.98 & 0.4675 & 0.2262 & 0.7468 \\
-\;+ batched cell rewrites                 & 0.9704 & 0.7192 & 0.98 & 0.4675 & 0.2500 & 0.7518 \\
-\;+ printed-label row keys                & 0.9704 & 0.7262 & 0.98 & 0.4873 & 0.2976 & 0.7617 \\
-\;$-$ rows proven not to match (2)        & 0.9704 & 0.7262 & 0.98 & 0.5032 & 0.2976 & 0.7634 \\
-\;+ three row sets restored               & 0.9704 & 0.7262 & 0.98 & 0.5151 & 0.2976 & 0.7647 \\
-\;+ caption-semantics table swap           & 0.9704 & 0.7178 & 0.98 & 0.5151 & 0.2976 & 0.7619 \\
-\;$-$ swap reverted, $+$ two key unions   & \textbf{0.9704} & \textbf{0.7319} & \textbf{0.98} & \textbf{0.4992} & \textbf{0.2976} & \textbf{0.7649} \\
+v2  & initial pipeline                          & 0.6324 & 0.3587 & 0.68 & 0.3221 & 0.1310 & 0.4563 \\
+v6  & \;+ selection set size, hosted reader     & 0.6474 & 0.3887 & 0.82 & 0.2849 & 0.0952 & 0.4787 \\
+v9  & \;+ LLM selector, visual table reading    & 0.7991 & 0.4737 & 0.78 & 0.2738 & 0.0952 & \textbf{0.5519} \\
+v19 & \;+ hand-authored table row keys          & 0.7991 & 0.4737 & 0.78 & 0.3405 & --- & 0.5602 \\
+v26 & \;+ answer audit against the PDFs         & 0.8554 & 0.5347 & 0.84 & 0.3405 & 0.1984 & 0.6166 \\
+v32 & \;+ audit continued                       & 0.8789 & 0.5606 & 0.86 & 0.3405 & 0.2103 & 0.6366 \\
+v41 & \;+ seven paper-set corrections           & 0.9704 & 0.6610 & 0.94 & 0.3405 & 0.2103 & 0.7095 \\
+v43 & \;+ \texttt{equation\_algorithm} evidence & 0.9704 & 0.7121 & 0.96 & 0.3405 & 0.2103 & 0.7287 \\
+v44 & \;+ figure-counting answers               & 0.9704 & 0.7121 & 0.98 & 0.3516 & 0.2103 & 0.7322 \\
+v45 & \;+ short-name table row keys             & 0.9704 & 0.7121 & 0.98 & 0.4283 & 0.2262 & 0.7425 \\
+v46 & \;$-$ rows proven not to match            & 0.9704 & 0.7121 & 0.98 & 0.4675 & 0.2262 & 0.7468 \\
+v48 & \;+ batched cell rewrites, 3 candidate rows & 0.9704 & 0.7192 & 0.98 & 0.4534 & 0.2500 & 0.7502 \\
+v49 & \;$-$ the 3 candidate rows, all missed    & 0.9704 & 0.7192 & 0.98 & 0.4675 & 0.2500 & 0.7518 \\
+v51 & \;+ printed-label row keys                & 0.9704 & 0.7262 & 0.98 & 0.4873 & 0.2976 & 0.7617 \\
+v52 & \;$-$ rows proven not to match (2)        & 0.9704 & 0.7262 & 0.98 & 0.5032 & 0.2976 & 0.7634 \\
+v53 & \;+ three row sets restored               & 0.9704 & 0.7262 & 0.98 & 0.5151 & 0.2976 & 0.7647 \\
+v55 & \;+ caption-semantics table swap          & 0.9704 & 0.7178 & 0.98 & 0.5151 & 0.2976 & 0.7619 \\
+v57 & \;$-$ swap reverted, $+$ two key unions   & \textbf{0.9704} & \textbf{0.7319} & \textbf{0.98} & \textbf{0.4992} & \textbf{0.2976} & \textbf{0.7649} \\
 \bottomrule
 \end{tabular}
-\caption{Official evaluator results on the LitTraceQA held-out test split, in
-submission order; each line names the change distinguishing it from the line
-above. Paper F1 and evidence F1 carry weight $1/3$ each in \emph{overall}; MC,
-row F1 and cell accuracy carry $1/9$ each. Components are the evaluator's values
-rounded to four decimals, so recomputing \emph{overall} from them can differ in
-the last digit. Row two is our best \textbf{fully automated} submission; every
-later row involves per-question intervention. The penultimate row
-\emph{regressed}; we report it rather than only our best.}
+\caption{Official evaluator results on \texttt{littraceqa-test}, in submission
+order; each line names the change from the line above. We made 23 scored
+submissions; listed here are the 17 that set a new best, plus \texttt{v55}, which
+regressed and which we report rather than only our best. The other five explored
+variants that did not beat the best score at the time, and all 23 are in the
+repository. \texttt{v9} is our best \textbf{fully automated} submission; every
+later row involves per-question intervention. Paper F1 and evidence F1 carry
+weight $1/3$ each in \emph{overall}; MC, row F1 and cell accuracy carry $1/9$
+each. Cell accuracy is the evaluator's \emph{macro} value; the micro value it
+also reports differs (for \texttt{v57}, $0.3563 = 31/87$). Components are rounded
+to four decimals, so recomputing \emph{overall} from them can differ in the last
+digit. We retained \texttt{v19}'s overall but not its per-component output, and
+its cell accuracy is not recoverable, so we leave that cell empty rather than
+print a reconstruction.}
 \label{tab:results}
 \end{table*}
 
@@ -439,12 +458,11 @@ the weight. Table row F1 and cell accuracy remain our weakest components at
 $0.4992$ and $0.2976$ and together hold the majority of our remaining headroom.
 
 \paragraph{Automated verifiers.}
-Five checks ran over every candidate file and are the reusable part of our
-tooling. (1) An \emph{object-id verifier} regexes captions from each page and
+Five checks ran over every candidate file. (1) An \emph{object-id verifier} regexes captions from each page and
 confirms the cited \texttt{table\_id}/\texttt{figure\_id} exists there; 48 of 49
 of our ids passed and the single failure was a real error. (2) A
 \emph{name-presence check}: does each emitted paper's text ever mention an entity
-the question names --- a paper that never writes ``ERASE'' is not the ERASE
+the question names. A paper that never writes ``ERASE'' is not the ERASE
 paper. (3) The same check against all 27{,}487 titles, which finds papers never
 retrieved and therefore unreachable by any text-based check. (4) A
 \emph{crowded-page check} flagging table items on pages carrying more than one
@@ -496,8 +514,7 @@ the main reason our table components stalled.
 \section{Negative Results}
 \label{sec:negative}
 
-We list heuristics that seemed reasonable, were measured, and were dropped. These
-are the most transferable part of the paper.
+We list heuristics that seemed reasonable, were measured, and were dropped.
 
 \begin{itemize}\itemsep2pt
 \item \textbf{Padding paper sets.} From one submission's precision and recall
@@ -519,8 +536,8 @@ wrong.
 caption-bearing pages.} The conditional is real ($52/68$), but all seven of our
 \texttt{text\_span} items on such pages are verified prose, so there was nothing
 to convert.
-\item \textbf{Caption semantics as proof.} Our largest single regression. A
-question asks for a setting whose wording matches Table~2's caption almost
+\item \textbf{Caption semantics as proof.} The one submission on our best-score
+path that scored below the one before it ($0.7647 \to 0.7619$). A question asks for a setting whose wording matches Table~2's caption almost
 verbatim (``expand the Cambrian-7M dataset with 2M pure text data'') while
 Table~3 reads ``using Cambrian 2.5M''; gold cites \textbf{Table~3}. Reverting
 returned exactly $+1.0$ of evidence sum, confirming it. Caption semantics is a
@@ -541,35 +558,67 @@ sides read \texttt{None} and it reported ``0 of 71 identical'' when the true
 answer was 26. (iv) We reported a PDF as unreadable and concluded the pipeline
 never saw it; probing all 112 selected papers in isolated subprocesses gave
 \emph{zero} unreadable, and the crash was resource exhaustion in our own script.
-We record these because an analysis pipeline is itself an experimental
-instrument, and ours was wrong four times in ways invisible until checked.
+An analysis pipeline is itself an experimental instrument, and ours was wrong
+four times in ways that stayed invisible until checked.
 
 \section{Setup and Disclosed Resources}
 \label{sec:setup}
 
-\paragraph{Data.} Released LitTraceQA metadata pool (27{,}487 papers),
-development split (55) and input-only test split (71) from the official Hugging
-Face dataset (CC BY-NC 4.0). PDFs were fetched from the publisher URLs in the
-released metadata. No additional annotated data was used and no synthetic
-training data was generated.
+\paragraph{Data.} The released LitTraceQA metadata pool (27{,}487 papers), the
+development split (55) and the input-only test split (71), from the official
+Hugging Face dataset under CC BY-NC 4.0
+\citep{liu2026littraceqabenchmarkmultistagegrounding,littraceqa-data}. PDFs were
+fetched from the publisher URLs in the released metadata. No additional annotated
+data was used and no synthetic training data was generated. All held-out scores come
+from the official evaluator Space \citep{groundlm-eval}; we never held the test
+labels.
 
-\paragraph{Models and APIs.} Hosted \texttt{gemini-flash-lite-latest} and sibling
-Gemini models on the free tier for selection and reading; a locally served Qwen3
-behind an OpenAI-compatible \texttt{llama.cpp} endpoint for text-only selection
-experiments, added because the hosted free-tier quota (500 requests/day) cannot
-score one development split twice; a cross-encoder reranker and a sentence
-embedding model for retrieval. The audit loop of \S\ref{sec:system} was performed
-by an LLM agent (Anthropic Claude) reading page text and rasterised pages. We
-fine-tuned nothing and trained no model.
+\paragraph{Models and APIs.} Selection and reading ran on the Gemini free tier
+\citep{gemini-models}, rotating over
+\texttt{gemini-flash-lite-latest}, \texttt{gemini-3.5-flash} and
+\texttt{gemini-flash-latest} in that order, with \texttt{gemini-3.7-flash} used
+only in one selection experiment. Rotation is forced by the quota, which is
+per model per day: \texttt{gemini-flash-latest} resolved to
+\texttt{gemini-3.6-flash} with a measured 20 requests/day, and a 71-question run
+needs roughly 210 calls. Decoding was greedy (temperature $0$). Two of these
+names are floating aliases, so the exact weights behind them at run time are not
+something we can pin: our runs fall between 16 and 19 August 2026, and we did not
+record the resolved model version returned per call.
 
-\paragraph{Software and compute.} Python; PyMuPDF for page text, caption indices
-and rasterisation; the organisers' released \texttt{evaluate.py} and
-\texttt{validate\_submission.py} for local checks. All work ran on a single
-workstation with no GPU training.
+Text-only selection experiments used a local
+\texttt{Qwen3.6-27B-UD-Q4\_K\_XL} GGUF served by \texttt{llama.cpp}'s
+\texttt{llama-server} (\texttt{-{}-n-gpu-layers 42 -{}-ctx-size 12288
+-{}-parallel 1 -{}-cont-batching -{}-jinja -{}-cache-type-k q8\_0
+-{}-cache-type-v q8\_0}). Decoding used temperature $0.7$, \texttt{top\_p} $0.9$
+and three samples per question, with output grammar-constrained to our read
+schema and Qwen3 thinking switched off. \texttt{Qwen3-8B} \citep{qwen3} was the
+transformers-path default. We did not record the \texttt{llama.cpp} build.
+Retrieval used \texttt{BAAI/bge-large-en-v1.5} for dense embeddings
+\citep{bge-embed} and \texttt{BAAI/bge-reranker-base} as cross-encoder reranker
+\citep{bge-rerank}. The audit loop of \S\ref{sec:system} was carried out by an
+LLM agent (Anthropic Claude \citep{claude-models}) reading page text and
+rasterised pages; we did not record the dated model version it ran under. We
+fine-tuned nothing and trained no model, so there are no checkpoints of ours to
+release.
 
-\paragraph{Reproducibility.} We release the pipeline, the five automated
-verifiers, the experiment scripts, and reports recording each measurement
-including the negative ones.
+\paragraph{Software and compute.} Python, with PyMuPDF \citep{pymupdf} for page
+text, caption indices and rasterisation. Local checks used the organisers'
+released \texttt{evaluate.py}, and their \texttt{validate\_submission.py}
+extended by us with the dead-run guard described in \S\ref{sec:results}. All work
+ran on a single workstation; no model was trained, and the only GPU use was
+local inference and reranking.
+
+\paragraph{Reproducibility.} The repository holds the pipeline, the 23 experiment
+scripts, the submitted test-output file, and reports recording each measurement
+including the negative ones. It also holds three audit scripts:
+\texttt{count\_conventions.py} recomputes every count in
+Table~\ref{tab:conventions} from the development split,
+\texttt{validate\_table3.py} recomputes \emph{overall} from the official
+components of all 23 submissions, and \texttt{check\_manuscript.py} checks the
+numbers printed here against both. We redistribute no dataset and no test label;
+the scripts read the official release. The crowded-page check of
+\S\ref{sec:results} was run ad hoc and is described in the reports rather than
+packaged.
 
 \section{Limitations}
 \label{sec:limitations}
@@ -589,12 +638,11 @@ questions and several rest on small denominators ($3/3$, $8/8$, $10/10$). They
 were predictive on test, which is evidence, but they are not established at any
 conventional level of confidence.
 
-Third, and we think most usefully for the workshop, part of what the metric
-measures is \emph{reproduction of the annotator's bookkeeping} rather than
-grounding. Two mechanisms do this. Evidence keys include the visible object id,
+Third, part of what the metric measures is \emph{reproduction of the annotator's
+bookkeeping} rather than grounding. Two mechanisms do this. Evidence keys include the visible object id,
 so a system that locates the correct claim on the correct page of the correct
 paper scores \textbf{zero} for that item if it writes \texttt{Table 2} where the
-annotator wrote \texttt{Table 3} --- Table~\ref{tab:example} is exactly that case,
+annotator wrote \texttt{Table 3}. Table~\ref{tab:example} is exactly that case,
 and it cost us a full $1.0$ of evidence F1 on one question. Table cell accuracy is
 gated on exact row-key matching, so a question whose invented key wording we
 cannot reproduce contributes zero to \emph{two} of the five reported metrics no
@@ -602,8 +650,8 @@ matter how correct every extracted value is; we verified the values for several
 such questions and still scored zero on both. Our record of 0 for 13 on guessing
 those strings is evidence that this component is not reducible by better reading.
 
-We do not think this invalidates the benchmark --- provenance should be scored,
-and coarse keys are a reasonable way to do it --- but it does mean the table
+We do not think this invalidates the benchmark, since provenance should be
+scored and coarse keys are a reasonable way to do it, but it does mean the table
 components measure something different from the evidence components, and a
 system's score can move without its grounding improving. A future edition might
 publish the row-key vocabulary alongside the schema, accept any of a small set of
@@ -622,51 +670,25 @@ checkable by pointing at a specific page of a specific paper, which we consider 
 beneficial direction. The corresponding risk is that a confidently formatted
 citation is more persuasive than an uncited claim even when wrong, and our own
 error analysis shows the dominant failure is a citation that is \emph{almost}
-right --- correct paper, adjacent row. Systems of this kind should surface the
+right: the correct paper and an adjacent row. Systems of this kind should surface the
 located span for human confirmation rather than presenting a grounded answer as
 settled.
 
 \section{Conclusion}
 
 Team OdeD's LitTraceQA submission reached an official $0.7649$ from a $0.4563$
-start, and the useful part is where the gain came from: two-thirds of the metric
-is provenance rather than answering, the annotators' conventions are recoverable
-from 55 examples, and a macro metric over 71 questions is a precise enough
-instrument that a controlled submission can prove an individual prediction wrong.
-We also report what this process refuted, the four bugs it exposed in our own
-verifiers, and how much of our number reflects auditing rather than a system. For
-future participants we would compress the task into one sentence: locate the
-evidence the way the annotator located it, and check the row and column headers
-before believing a value you have found.
+start. Two-thirds of the metric is provenance rather than answering; the
+annotators' conventions are recoverable from 55 examples; and a macro metric over
+71 questions is a precise enough instrument that a controlled submission can
+establish that an individual prediction is wrong. We also report what the process
+refuted, the four bugs it exposed in our own verifiers, and how much of the final
+score reflects per-question auditing rather than a system that would transfer.
 
 \section*{Acknowledgements}
 
 We thank the GroundLM 2026 organisers for releasing the evaluator and validator,
 without which the analysis in this paper would not have been possible.
 
-\begin{thebibliography}{9}
-\bibitem[LitTraceQA(2026)]{littraceqa}
-LitTraceQA dataset (CC BY-NC 4.0).\\
-\url{https://huggingface.co/datasets/LitTraceQA/LitTraceQA}
-
-\bibitem[GroundLM(2026)]{groundlm}
-GroundLM 2026 Workshop, EMNLP 2026 --- shared task description, evaluator and
-submission rules.\\
-\url{https://groundlm.github.io/grouplm_emnlp2026/shared-tasks.html}
-
-\bibitem[GroundLM Evaluator(2026)]{evaluator}
-GroundLM 2026 online evaluator; source of record for all held-out scores
-reported here.\\
-\url{https://huggingface.co/spaces/YimuWang/GroundLM-2026-Eval}
-
-\bibitem[PyMuPDF(n.d.)]{pymupdf}
-PyMuPDF --- Python bindings for MuPDF, used for page text, caption indices and
-page rasterisation.\\
-\url{https://pymupdf.readthedocs.io}
-
-\bibitem[ACL(2026)]{aclstyle}
-ACL style files and ACL PubCheck.\\
-\url{https://github.com/acl-org/acl-style-files}
-\end{thebibliography}
+\bibliography{littraceqa_system}
 
 \end{document}

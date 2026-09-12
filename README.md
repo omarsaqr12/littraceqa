@@ -1,6 +1,6 @@
 # LitTraceQA — OdeD's system for GroundLM @ EMNLP 2026
 
-Team **OdeD** (Omar Saqr, Mostafa Gafaar — The American University in Cairo).
+Team **OdeD** (Omar Saqr, Mostafa Gaafar — The American University in Cairo).
 
 **Task.** Answer a research question by finding the paper(s) in a 27,487-paper
 pool, locating the specific evidence inside them (a table cell, a figure panel,

@@ -25,20 +25,19 @@ Contains 1 figure and 3 tables:
 
 | rule | status |
 |---|---|
-| 4--8 pages main content, references extra | **7 + refs** |
+| 4--8 pages main content, references extra | **8 + refs** |
 | Official ACL style, unmodified | `acl.sty` as shipped |
 | Title `<Team Name> at GroundLM 2026 Shared Tasks: <Title>` | "OdeD at GroundLM 2026 Shared Tasks: Reading the Scorer ..." |
 | Team name identical on evaluator / paper / OpenReview `teamname` | **OdeD** |
-| Author names, affiliations, contact info | Omar Saqr, Moustafa Gafaar, both American University in Cairo, with emails |
-| Report official evaluator results | Table 3 and Figure 1, all 16 scored submissions |
+| Author names, affiliations, contact info | Omar Saqr, Mostafa Gaafar, both The American University in Cairo, with emails |
+| Report official evaluator results | Table 3 (18 rows) and Figure 2 (all 23 scored submissions) |
 | Disclose external data, models, tools, APIs, synthetic data | Section 9 |
 | Report dev-set results, run comparisons, ablations | Tables 2--3, Figure 1, Sections 5--6, 8 |
 | Error analysis | Section 7 |
 | Conclusion, limitations, ethics | Sections 10--12 |
 
-Both authors are affiliated with the American University in Cairo, as confirmed
-by the authors. Moustafa Gafaar's contact address is on a different domain; that
-is a contact address, not an affiliation, which is what the rules ask for.
+Both authors are affiliated with The American University in Cairo, as confirmed
+by the authors, and both contact addresses are on the `aucegypt.edu` domain.
 
 ## Before submitting
 

@@ -1,0 +1,84 @@
+{
+ "counts": {
+  "one_key_per_paper_bijective": [
+   37,
+   55
+  ],
+  "one_key_per_paper_cardinality": [
+   45,
+   55
+  ],
+  "rows_eq_papers_multipaper": [
+   8,
+   8
+  ],
+  "rows_eq_papers_all_table_qs": [
+   9,
+   11
+  ],
+  "wording_implies_figure": [
+   10,
+   10
+  ],
+  "wording_implies_table": [
+   3,
+   3
+  ],
+  "wording_implies_equation_algorithm": [
+   4,
+   7
+  ],
+  "caption_on_page_implies_table": [
+   52,
+   68
+  ],
+  "text_span_paired_with_table": [
+   1,
+   64
+  ],
+  "text_span_paired_with_any_object": [
+   5,
+   95
+  ],
+  "gold_page_is_earliest_occurrence": [
+   17,
+   84
+  ],
+  "gold_page_is_middle_occurrence": [
+   61,
+   84
+  ],
+  "gold_page_is_latest_occurrence": [
+   6,
+   84
+  ]
+ },
+ "notes": {
+  "(papers,keys) histogram": {
+   "1,1": 24,
+   "1,2": 1,
+   "1,3": 1,
+   "3,3": 1,
+   "4,1": 4,
+   "4,2": 3,
+   "4,3": 1,
+   "4,4": 19,
+   "9,9": 1
+  },
+  "cardinality-but-not-bijective": 8,
+  "...all of shape": "4 gold papers, 4 keys, one paper carrying 2 keys and one cited by none",
+  "items skipped, PDF never fetched": 4,
+  "dev questions": 55,
+  "gold evidence items": 149,
+  "evidence items by source_type": {
+   "table": 64,
+   "text_span": 54,
+   "citation_context": 6,
+   "figure": 18,
+   "equation_algorithm": 7
+  },
+  "items on pages 6-7": 65,
+  "items on page 1": 5,
+  "distinct papers cited": 67
+ }
+}

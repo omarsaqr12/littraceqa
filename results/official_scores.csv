@@ -1,0 +1,24 @@
+order,run,file,paper_f1,evidence_f1,mc,row_f1,cell_acc,overall_shown,precision,provenance
+1,v2,test_v2_rerank,0.6324,0.3587,0.68,0.3221,0.1310,0.4563,4dp,reports/leaderboard_gap.md submission log
+2,v5,test_v5_local,0.6474,0.3324,0.72,0.2690,0.0873,0.4462,4dp,README history 7b92cfb
+3,v6,test_v6_hosted,0.6474,0.3887,0.82,0.2849,0.0952,0.4787,4dp,README history 7b92cfb
+4,v9,test_v9,0.7991,0.4737,0.78,0.2738,0.0952,0.5519,4dp,reports/leaderboard_gap.md submission log
+5,v10,test_v10,0.7991,0.4737,0.78,0.2738,0.0952,0.5519,4dp,reports/leaderboard_gap.md submission log
+6,v11,test_v11,0.7967,0.4667,0.82,0.2738,0.0595,0.5493,4dp,reports/leaderboard_gap.md submission log
+7,v14,test_v14,0.6559,0.4737,0.78,0.2738,0.0952,0.5042,4dp,README history 7b92cfb
+8,v16,test_v16,0.7897,0.4690,0.80,0.2262,0.0476,0.5389,4dp,README history 7b92cfb
+9,v19,test_v19,0.7991,0.4737,0.78,0.3405,,0.5602,4dp,"overall: commit 83a78b7 + paper_selection.md prose. paper/evidence/MC: proven identical to v9 by prediction-file diff. row F1: table_stage.md:560 (0.340476 across v19,v26,v32,v41,v43). cell acc: NEVER transcribed from evaluator output; not recoverable"
+10,v26,test_v26,0.8554,0.5347,0.84,0.3405,0.1984,0.6166,4dp,reports/paper_selection.md v19-v26 component table
+11,v32,test_v32,0.878873,0.560563,0.86,0.340476,0.210317,0.6366,full,evaluator JSON
+12,v41,test_v41,0.970423,0.661033,0.94,0.340476,0.210317,0.7095,full,evaluator JSON
+13,v43,test_v43,0.970423,0.712140,0.96,0.340476,0.210317,0.7287,full,evaluator JSON
+14,v44,test_v44,0.970423,0.712140,0.98,0.351587,0.210317,0.7322,full,evaluator JSON
+15,v45,test_v45,0.970423,0.712140,0.98,0.428307,0.226190,0.7425,full,evaluator JSON
+16,v46,test_v46,0.970423,0.712140,0.98,0.467460,0.226190,0.7468,full,evaluator JSON
+17,v48,test_v48,0.970423,0.719182,0.98,0.453401,0.250000,0.7502,full,evaluator JSON
+18,v49,test_v49,0.970423,0.719182,0.98,0.467460,0.250000,0.7518,full,evaluator JSON
+19,v51,test_v51,0.970423,0.726224,0.98,0.487302,0.297619,0.7617,full,evaluator JSON
+20,v52,test_v52,0.970423,0.726224,0.98,0.503175,0.297619,0.7634,full,evaluator JSON
+21,v53,test_v53,0.970423,0.726224,0.98,0.515079,0.297619,0.7647,full,evaluator JSON
+22,v55,test_v55,0.970423,0.717773,0.98,0.515079,0.297619,0.7619,full,evaluator JSON
+23,v57,test_v57,0.970423,0.731858,0.98,0.499206,0.297619,0.7649,full,evaluator JSON
