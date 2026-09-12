@@ -131,6 +131,15 @@ m = re.search(r"all (\d+) of our scored submissions", FLAT)
 check(m and int(m.group(1)) == len(SCORES),
       f"Figure 2 caption submission count disagrees with the CSV ({len(SCORES)})")
 
+# ------------------------------------- abstract file vs the abstract in the PDF
+abs_file = ROOT / "paper" / "openreview_abstract.txt"
+if abs_file.exists():
+    tex_abs = TEX.split(r"\begin{abstract}")[1].split(r"\end{abstract}")[0]
+    tex_abs = re.sub(r"\\(emph|textbf|texttt)\{([^}]*)\}", r"\2", tex_abs)
+    norm = lambda t: re.sub(r"[^a-z0-9]+", " ", t.lower()).strip()
+    check(norm(abs_file.read_text()) == norm(tex_abs),
+          "paper/openreview_abstract.txt has drifted from the abstract in the paper")
+
 # ---------------------------------------------------------------- report
 print(f"{checks} checks, {len(fails)} failed")
 for f in fails:
