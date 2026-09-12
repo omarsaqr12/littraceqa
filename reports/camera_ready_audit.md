@@ -1,6 +1,9 @@
 # Camera-ready forensic audit — LitTraceQA system paper (OdeD)
 
-Audit run 12 September 2026. **No manuscript edits have been made yet.**
+Audit run 12 September 2026. This report records the state **before** any edit;
+every finding was reproduced from artifacts first. Resolutions are appended at
+the end, and the edits themselves are listed in
+`reports/camera_ready_changelog.md`.
 Every number below was recovered from an artifact; none was inferred from what
 looked plausible. Source-of-truth order used: evaluator output → submitted JSONL
 → evaluator code → dev gold + audit scripts → generated reports → manuscript.
@@ -343,3 +346,32 @@ claims check out against the implementation:
 * **Any claim about the current online evaluator's behaviour.** Scores were
   produced between August and 19 August 2026 against the Space as it stood then.
   Old scores have not been reinterpreted under any later version.
+
+
+---
+
+## 7. Resolution status (appended after editing)
+
+| finding | status |
+|---|---|
+| A1 `v19` cell accuracy | **Fixed.** Cell left empty; caption explains. `validate_table3.py` now reports 23 submissions, 22 fully checkable, **0 inconsistent**. |
+| A2 `v48`/`v49` mislabel | **Fixed.** Both rows present with their own official values. |
+| A3 "sixteen scored submissions" | **Fixed.** 23 everywhere; Table 3 states its selection rule; Figure 2 plots all 23. |
+| A4 Table 2 `43/55` | **Fixed.** 45/55 with the cardinality wording; 37/55 reported for the strict reading. |
+| A5 Figure 1 `0.7322` label | **Fixed.** Reads "evidence types, MC". |
+| A6 Figure 1 dev/test mixing | **Fixed.** Annotation marked *dev*; caption states the distinction. |
+| A7 "two largest jumps" | **Fixed.** Removed from the Table 2 caption and from Contribution 2. |
+| A8 surname | **Fixed.** `Gaafar` everywhere, matching `~Mostafa_Gaafar1`. Author order unchanged. |
+| A9 Type 3 font | **Fixed.** `pdf.fonttype = 42`; no Type 3 font remains. |
+| A10 macro/micro label | **Fixed.** Column reads `cell acc. (macro)`; caption gives the micro value. |
+| Three required citations | **Fixed.** Organisers' entries, in a `.bib`, cited in the introduction. |
+| Own-paper `.bib` | **Fixed.** `paper/saqr-2026-oded.bib`. |
+| Decision letter | **Nothing to address** — `decision: Accept`, no reviews, no comments. |
+| PubCheck | **All Clear** on the final PDF. |
+| Table 2 row 7 denominator | **Fixed.** Relabelled "same-page `table`". |
+| Table 2 row 8 `10/38` | **Replaced** with a scripted, reproducible `17/84` and its definition. Listed as unverifiable in the validation report. |
+| `freeform_exact_match` null | **Not addressed.** The test split has no freeform questions, so the evaluator returns null; the paper reports the three answer metrics that exist. Left as is rather than adding a sentence about a metric that never applies. |
+
+Two findings from the edit pass itself, both caught by `check_manuscript.py`
+rather than by reading: a stale "other six" after the table was rewritten, and a
+caption check broken by line re-wrapping. The checker is now whitespace-tolerant.
