@@ -59,5 +59,5 @@ See `reports/camera_ready_style_changelog.md`.
 
 * `count_conventions.py` — regenerates all eight Table 2 counts from the 55 dev examples.
 * `validate_table3.py` — recomputes `overall` for all 23 submissions against a derived tolerance.
-* `check_manuscript.py` — 153 checks of the manuscript against those artifacts.
+* `check_manuscript.py` — 154 checks of the manuscript against those artifacts.
 * `official_scores.csv` — every scored submission with its provenance.
