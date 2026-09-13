@@ -16,6 +16,13 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc}
 
+% Long monospace identifiers (model names, paths, CLI flags) are single
+% unbreakable boxes in a two-column measure, so TeX has to stretch the
+% interword spaces on their line. \bk marks a legal break point inside such
+% an identifier: it prints nothing and inserts no hyphen, so the identifier
+% still reads exactly as written.
+\newcommand{\bk}{\allowbreak}
+
 \title{OdeD at GroundLM 2026 Shared Tasks:\\
 Reading the Scorer for Literature-Grounded QA}
 
@@ -155,7 +162,7 @@ table components weighted $1/9$ stall between $0.05$ and $0.52$ and hold most of
 our remaining headroom. \texttt{v55} regressed: we had labelled a
 caption-semantics inference ``confirmed'' when it was a heuristic, and reverting
 it returned exactly the $+1.0$ of evidence sum the arithmetic predicted. Drawn from
-\texttt{results/official\_scores.csv}, which is built from the evaluator's
+\texttt{results/\bk{}official\_\bk{}scores.csv}, which is built from the evaluator's
 submission log.}
 \label{fig:progress}
 \end{figure*}
@@ -182,7 +189,7 @@ scored submissions, and Table~\ref{tab:example} gives one question end to end.
 Predictions and gold are compared as sets of tuples
 $(\textit{paper\_id}, \textit{source\_type}, \textit{page}, \textit{object\_id})$,
 where \textit{object\_id} is a normalised visible identifier for \texttt{table},
-\texttt{figure}, \texttt{equation\_algorithm} and \texttt{citation\_context} and
+\texttt{figure}, \texttt{equation\_\bk{}algorithm} and \texttt{citation\_\bk{}context} and
 is \emph{empty} for \texttt{text\_span}. Three consequences shaped our work.
 (i) A \texttt{text\_span} matches on paper and page alone, making it the cheapest
 correct guess when the type is uncertain. (ii) Citing the right page with the
@@ -201,7 +208,7 @@ when fine-tuned on Cambrian~7M plus an extra 2M pure-text samples\ldots?''}\\[2p
 \midrule
 \texttt{gold\_papers}: \texttt{iccv2025\_01015} \\
 \texttt{evidence}: \texttt{(iccv2025\_01015, table, p3, "Table 3")} \\
-\texttt{answer.multiple\_choice.gold}: \texttt{B} \\[3pt]
+\texttt{answer.\bk{}multiple\_\bk{}choice.\bk{}gold}: \texttt{B} \\[3pt]
 \emph{Page 3 carries both Table~2 (``expand the Cambrian-7M dataset with 2M pure
 text data'') and Table~3 (``using Cambrian 2.5M''). The question's wording matches
 Table~2 almost verbatim, and gold cites \textbf{Table~3}. Choosing Table~2 cost
@@ -289,7 +296,7 @@ Gold page is the \emph{earliest} occurrence of the value & 17/84 \\
 \bottomrule
 \end{tabular}
 \caption{Conventions recovered from the development split, recomputed for this
-version by \texttt{results/count\_conventions.py}. Row 1 counts questions whose
+version by \texttt{results/\bk{}count\_\bk{}conventions.py}. Row 1 counts questions whose
 number of distinct evidence keys equals their number of gold papers; the
 stricter reading, one key per paper with no paper left uncited, holds for 37/55.
 Row 8 counts gold items whose value occurs on more than one page of the cited
@@ -312,7 +319,7 @@ and we sized our evidence sets accordingly.
 Conditioning gold's source type on the question's vocabulary is predictive on
 the development split, though on small denominators
 (Table~\ref{tab:conventions}). Acting on it produced a substantial evidence gain:
-we had been emitting \emph{no} \texttt{equation\_algorithm} items at all, and
+we had been emitting \emph{no} \texttt{equation\_\bk{}algorithm} items at all, and
 adding them alongside \texttt{text\_span} on six equation-form questions
 coincided with official evidence F1 moving from $0.6610$ to $0.7121$ (that
 submission also re-aimed two pages, so the delta is not attributable to the type
@@ -370,7 +377,7 @@ row keys are short names rather than full metadata titles, and that one specific
 candidate string was wrong.
 
 \paragraph{Reading exact fractions.}
-\texttt{table\_cell\_accuracy\_micro} is $\textit{cell\_correct}/\textit{cell\_total}$
+\texttt{table\_\bk{}cell\_\bk{}accuracy\_\bk{}micro} is $\textit{cell\_correct}/\textit{cell\_total}$
 and \textit{cell\_total} is a property of gold. Read as an exact fraction it gives
 $23/87$ and later $31/87$: gold has exactly \textbf{87} comparable cells across
 the 21 table questions, and the $+8$ was one question's eight cells.
@@ -404,9 +411,9 @@ would perform on unseen questions.
 \label{sec:results}
 
 Table~\ref{tab:results} reports official evaluator output for our scored
-submissions on \texttt{littraceqa-test} (71 questions). Every figure is as
+submissions on \texttt{littraceqa-\bk{}test} (71 questions). Every figure is as
 returned by the evaluator; no number in this paper is computed by us from private
-labels. We did not submit to the optional \texttt{littraceqa-test-extra}
+labels. We did not submit to the optional \texttt{littraceqa-\bk{}test-\bk{}extra}
 diagnostic track.
 
 \begin{table*}[t]
@@ -435,7 +442,7 @@ v55 & \;+ caption-semantics table swap          & 0.9704 & 0.7178 & 0.98 & 0.515
 v57 & \;$-$ swap reverted, $+$ two key unions   & \textbf{0.9704} & \textbf{0.7319} & \textbf{0.98} & \textbf{0.4992} & \textbf{0.2976} & \textbf{0.7649} \\
 \bottomrule
 \end{tabular}
-\caption{Official evaluator results on \texttt{littraceqa-test}, in submission
+\caption{Official evaluator results on \texttt{littraceqa-\bk{}test}, in submission
 order; each line names the change from the line above. Listed are the submissions
 marking each distinct stage of our progression, plus \texttt{v55}, which
 regressed and which we report rather than only our best. Our submission history
@@ -576,26 +583,26 @@ from the official evaluator Space \citep{groundlm-eval}; we never held the test
 labels.
 
 \paragraph{Models and APIs.} Selection and reading ran on the Gemini free tier
-\citep{gemini-models}, rotating over \texttt{gemini-flash-lite-latest},
-\texttt{gemini-3.5-flash} and \texttt{gemini-flash-latest} in that order, with
-\texttt{gemini-3.7-flash} used only in one selection experiment. Rotation is
-forced by the per-model daily quota: \texttt{gemini-flash-latest} resolved to
-\texttt{gemini-3.6-flash} with a measured 20 requests/day, and a 71-question run
+\citep{gemini-models}, rotating over \texttt{gemini-\bk{}flash-\bk{}lite-\bk{}latest},
+\texttt{gemini-\bk{}3.5-\bk{}flash} and \texttt{gemini-\bk{}flash-\bk{}latest} in that order, with
+\texttt{gemini-\bk{}3.7-\bk{}flash} used only in one selection experiment. Rotation is
+forced by the per-model daily quota: \texttt{gemini-\bk{}flash-\bk{}latest} resolved to
+\texttt{gemini-\bk{}3.6-\bk{}flash} with a measured 20 requests/day, and a 71-question run
 needs roughly 210 calls. Decoding was greedy (temperature $0$). Two names are
 floating aliases, so the exact weights behind them cannot be pinned: our runs
 fall between 16 and 19 August 2026, and we did not record the resolved version
 returned per call.
 
 Text-only selection experiments used a local
-\texttt{Qwen3.6-27B-UD-Q4\_K\_XL} GGUF served by \texttt{llama.cpp}'s
-\texttt{llama-server} (\texttt{-{}-n-gpu-layers 42 -{}-ctx-size 12288
--{}-parallel 1 -{}-cont-batching -{}-jinja -{}-cache-type-k q8\_0
--{}-cache-type-v q8\_0}). Decoding used temperature $0.7$, \texttt{top\_p} $0.9$
+\texttt{Qwen3.6-\bk{}27B-\bk{}UD-\bk{}Q4\_\bk{}K\_\bk{}XL} GGUF served by \texttt{llama.cpp}'s
+\texttt{llama-\bk{}server} (\texttt{-{}-n-\bk{}gpu-\bk{}layers 42 -{}-ctx-\bk{}size 12288
+-{}-parallel 1 -{}-cont-\bk{}batching -{}-jinja -{}-cache-\bk{}type-\bk{}k q8\_0
+-{}-cache-\bk{}type-\bk{}v q8\_0}). Decoding used temperature $0.7$, \texttt{top\_p} $0.9$
 and three samples per question, with output grammar-constrained to our read
 schema and Qwen3 thinking switched off. \texttt{Qwen3-8B} \citep{qwen3} was the
 transformers-path default. We did not record the \texttt{llama.cpp} build.
-Retrieval used \texttt{BAAI/bge-large-en-v1.5} for dense embeddings
-\citep{bge-embed} and \texttt{BAAI/bge-reranker-base} as cross-encoder reranker
+Retrieval used \texttt{BAAI/\bk{}bge-\bk{}large-\bk{}en-\bk{}v1.5} for dense embeddings
+\citep{bge-embed} and \texttt{BAAI/\bk{}bge-\bk{}reranker-\bk{}base} as cross-encoder reranker
 \citep{bge-rerank}. The audit loop of \S\ref{sec:system} was carried out by an
 LLM agent (Anthropic Claude \citep{claude-models}) reading page text and
 rasterised pages; we did not record the dated model version. We did not fine-tune
@@ -611,11 +618,11 @@ was limited to dense retrieval/embedding, reranking and local inference.
 \url{https://github.com/omarsaqr12/littraceqa}: the pipeline, the 23 experiment
 scripts, and reports recording each measurement including the negative ones, plus
 three audit scripts:
-\texttt{count\_conventions.py} recomputes every count in
+\texttt{count\_\bk{}conventions.py} recomputes every count in
 Table~\ref{tab:conventions} from the development split,
-\texttt{validate\_table3.py} recomputes \emph{overall} from the official
+\texttt{validate\_\bk{}table3.py} recomputes \emph{overall} from the official
 components of every submission in the evaluator log, and
-\texttt{check\_manuscript.py} checks the numbers printed here against both. We
+\texttt{check\_\bk{}manuscript.py} checks the numbers printed here against both. We
 redistribute no dataset or test label; the scripts read the official release. The crowded-page check of
 \S\ref{sec:results} was run ad hoc and is described in the reports rather than
 packaged.
@@ -658,7 +665,7 @@ alongside the schema, accept a small set of canonical object-id spellings, or
 score cells against gold rows independently of key matching. Any of the three
 would make the answer metrics measure answering.
 
-Fourth, we did not submit to \texttt{littraceqa-test-extra}, so we cannot report
+Fourth, we did not submit to \texttt{littraceqa-\bk{}test-\bk{}extra}, so we cannot report
 how these findings transfer to its larger question pool.
 
 \section{Ethics}
