@@ -476,7 +476,7 @@ mid-run, with no error anywhere in the trace.
 \section{Error Analysis}
 \label{sec:errors}
 
-\paragraph{The dominant failure is the right paper and the wrong row.}
+\paragraph{The dominant failure is the right paper, wrong row.}
 Of the answer errors we found and corrected, almost none are hallucinations. They
 are values genuinely printed in the cited paper, one row or one column from the
 one asked about: the un-finetuned base-model row instead of the fine-tuned one;
@@ -576,16 +576,15 @@ from the official evaluator Space \citep{groundlm-eval}; we never held the test
 labels.
 
 \paragraph{Models and APIs.} Selection and reading ran on the Gemini free tier
-\citep{gemini-models}, rotating over
-\texttt{gemini-flash-lite-latest}, \texttt{gemini-3.5-flash} and
-\texttt{gemini-flash-latest} in that order, with \texttt{gemini-3.7-flash} used
-only in one selection experiment. Rotation is forced by the quota, which is
-per model per day: \texttt{gemini-flash-latest} resolved to
+\citep{gemini-models}, rotating over \texttt{gemini-flash-lite-latest},
+\texttt{gemini-3.5-flash} and \texttt{gemini-flash-latest} in that order, with
+\texttt{gemini-3.7-flash} used only in one selection experiment. Rotation is
+forced by the per-model daily quota: \texttt{gemini-flash-latest} resolved to
 \texttt{gemini-3.6-flash} with a measured 20 requests/day, and a 71-question run
-needs roughly 210 calls. Decoding was greedy (temperature $0$). Two of these
-names are floating aliases, so the exact weights behind them at run time are not
-something we can pin: our runs fall between 16 and 19 August 2026, and we did not
-record the resolved model version returned per call.
+needs roughly 210 calls. Decoding was greedy (temperature $0$). Two names are
+floating aliases, so the exact weights behind them cannot be pinned: our runs
+fall between 16 and 19 August 2026, and we did not record the resolved version
+returned per call.
 
 Text-only selection experiments used a local
 \texttt{Qwen3.6-27B-UD-Q4\_K\_XL} GGUF served by \texttt{llama.cpp}'s
@@ -599,26 +598,24 @@ Retrieval used \texttt{BAAI/bge-large-en-v1.5} for dense embeddings
 \citep{bge-embed} and \texttt{BAAI/bge-reranker-base} as cross-encoder reranker
 \citep{bge-rerank}. The audit loop of \S\ref{sec:system} was carried out by an
 LLM agent (Anthropic Claude \citep{claude-models}) reading page text and
-rasterised pages; we did not record the dated model version it ran under. We
-fine-tuned nothing and trained no model, so there are no checkpoints of ours to
-release.
+rasterised pages; we did not record the dated model version. We fine-tuned and
+trained nothing, so there are no checkpoints of ours to release.
 
 \paragraph{Software and compute.} Python, with PyMuPDF \citep{pymupdf} for page
 text, caption indices and rasterisation. Local checks used the organisers'
-released \texttt{evaluate.py}, and their \texttt{validate\_submission.py}
-extended by us with the dead-run guard described in \S\ref{sec:results}. All work
-ran on a single workstation; no model was trained, and the only GPU use was
-local inference and reranking.
+\texttt{evaluate.py} and their \texttt{validate\_submission.py} extended with the
+dead-run guard of \S\ref{sec:results}. All work ran on one workstation; the only
+GPU use was local inference and reranking.
 
 \paragraph{Reproducibility.} The repository holds the pipeline, the 23 experiment
 scripts, the submitted test-output file, and reports recording each measurement
-including the negative ones. It also holds three audit scripts:
+including the negative ones, plus three audit scripts:
 \texttt{count\_conventions.py} recomputes every count in
 Table~\ref{tab:conventions} from the development split,
 \texttt{validate\_table3.py} recomputes \emph{overall} from the official
 components of every submission in the evaluator log, and
-\texttt{check\_manuscript.py} checks the numbers printed here against both. We redistribute no dataset and no test label;
-the scripts read the official release. The crowded-page check of
+\texttt{check\_manuscript.py} checks the numbers printed here against both. We
+redistribute no dataset and no test label; the scripts read the official release. The crowded-page check of
 \S\ref{sec:results} was run ad hoc and is described in the reports rather than
 packaged.
 
@@ -626,39 +623,39 @@ packaged.
 \label{sec:limitations}
 
 The most important limitation is what our headline number represents. Our best
-\emph{fully automated} run scores $\mathbf{0.5519}$ (row two of
-Table~\ref{tab:results}); the reported $0.7649$ additionally includes
-per-question auditing against source PDFs and corrections attributed using
-leaderboard feedback. The audit is not a model that would run on new questions,
-and the attribution is adaptation to this particular split. A reader interested
-in what an automated system achieves on LitTraceQA should read the $0.5519$ row.
-We report both prominently for that reason, and we include the submission that
-regressed rather than only our best.
+\emph{fully automated} run scores $\mathbf{0.5519}$ (v9 in
+Table~\ref{tab:results}); the reported $0.7649$ adds per-question auditing
+against source PDFs and corrections attributed using leaderboard feedback. The
+audit is not a model that would run on new questions, and the attribution is
+adaptation to this split. A reader interested in what an automated system
+achieves on LitTraceQA should read the $0.5519$ row. We report both prominently
+for that reason, and include the submission that regressed rather than only our
+best.
 
 Second, the conventions in \S\ref{sec:conventions} are counts over 55 development
 questions and several rest on small denominators ($3/3$, $8/8$, $10/10$). They
-were predictive on test, which is evidence, but they are not established at any
+were predictive on test, which is evidence, but are not established at any
 conventional level of confidence.
 
 Third, part of what the metric measures is \emph{reproduction of the annotator's
-bookkeeping} rather than grounding. Two mechanisms do this. Evidence keys include the visible object id,
-so a system that locates the correct claim on the correct page of the correct
-paper scores \textbf{zero} for that item if it writes \texttt{Table 2} where the
-annotator wrote \texttt{Table 3}. Table~\ref{tab:example} is exactly that case,
-and it cost us a full $1.0$ of evidence F1 on one question. Table cell accuracy is
-gated on exact row-key matching, so a question whose invented key wording we
-cannot reproduce contributes zero to \emph{two} of the five reported metrics no
-matter how correct every extracted value is; we verified the values for several
-such questions and still scored zero on both. Our record of 0 for 13 on guessing
-those strings is evidence that this component is not reducible by better reading.
+bookkeeping} rather than grounding. Two mechanisms do this. Evidence keys include
+the visible object id, so a system locating the correct claim on the correct page
+of the correct paper scores \textbf{zero} if it writes \texttt{Table 2} where the
+annotator wrote \texttt{Table 3}; Table~\ref{tab:example} is that case, costing a
+full $1.0$ of evidence F1 on one question. Table cell accuracy is gated on exact
+row-key matching, so a question whose invented key wording we cannot reproduce
+contributes zero to \emph{two} of the five metrics however correct the extracted
+values are; we verified values for several such questions and still scored zero
+on both. Our record of 0 for 13 on guessing those strings is evidence that this
+component is not reducible by better reading.
 
-We do not think this invalidates the benchmark, since provenance should be
-scored and coarse keys are a reasonable way to do it, but it does mean the table
-components measure something different from the evidence components, and a
-system's score can move without its grounding improving. A future edition might
-publish the row-key vocabulary alongside the schema, accept any of a small set of
-canonical object-id spellings, or score cells against gold rows independently of
-key matching. Any of the three would make the answer metrics measure answering.
+This does not invalidate the benchmark, since provenance should be scored and
+coarse keys are a reasonable way to do it, but the table components measure
+something different from the evidence components, and a system's score can move
+without its grounding improving. A future edition might publish the row-key
+vocabulary alongside the schema, accept a small set of canonical object-id
+spellings, or score cells against gold rows independently of key matching. Any of
+the three would make the answer metrics measure answering.
 
 Fourth, we did not submit to \texttt{littraceqa-test-extra}, so we cannot report
 how these findings transfer to its larger question pool.
@@ -666,30 +663,27 @@ how these findings transfer to its larger question pool.
 \section{Ethics}
 
 Papers were retrieved from publisher-provided URLs in the released metadata and
-used only for evidence extraction, within the dataset's CC BY-NC 4.0 terms. The
-purpose of a system like ours is to make claims about scientific literature
-checkable by pointing at a specific page of a specific paper, which we consider a
-beneficial direction. The corresponding risk is that a confidently formatted
-citation is more persuasive than an uncited claim even when wrong, and our own
-error analysis shows the dominant failure is a citation that is \emph{almost}
-right: the correct paper and an adjacent row. Systems of this kind should surface the
-located span for human confirmation rather than presenting a grounded answer as
-settled.
+used only for evidence extraction, within the dataset's CC BY-NC 4.0 terms. Such
+systems make claims about literature checkable by pointing at a specific page of a
+specific paper, which we consider beneficial. The risk is that a confidently
+formatted citation persuades even when wrong, and our error analysis shows the
+dominant failure is a citation that is \emph{almost} right: the correct paper and
+an adjacent row. Such systems should surface the located span for confirmation
+rather than presenting a grounded answer as settled.
 
 \section{Conclusion}
 
 Team OdeD's LitTraceQA submission reached an official $0.7649$ from a $0.4563$
 start. Two-thirds of the metric is provenance rather than answering; the
 annotators' conventions are recoverable from 55 examples; and a macro metric over
-71 questions is a precise enough instrument that a controlled submission can
-establish that an individual prediction is wrong. We also report what the process
-refuted, the four bugs it exposed in our own verifiers, and how much of the final
-score reflects per-question auditing rather than a system that would transfer.
+71 questions is precise enough that a controlled submission can establish that an
+individual prediction is wrong. We also report what the process refuted, the four
+bugs it exposed in our verifiers, and how much of the score reflects per-question
+auditing rather than a system that would transfer.
 
 \section*{Acknowledgements}
 
-We thank the GroundLM 2026 organisers for releasing the evaluator and validator,
-without which the analysis in this paper would not have been possible.
+We thank the GroundLM 2026 organisers for releasing the evaluator and validator.
 
 \bibliography{littraceqa_system}
 
