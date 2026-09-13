@@ -16,7 +16,7 @@ Shared Tasks: Reading the Scorer for Literature-Grounded QA*.
 |---|---|
 | first submission | 0.4563 |
 | best **fully automated** run | **0.5519** |
-| best submission | **0.7649** (`preds/test_v57.jsonl`) |
+| best submission | **0.7649** (`submission/littraceqa-test_OdeD.jsonl`) |
 
 The gap between 0.5519 and 0.7649 is per-question auditing against the source
 PDFs plus leaderboard-feedback attribution, not a system that would generalise.
@@ -58,8 +58,8 @@ answer_score = (multiple_choice_accuracy + table_row_f1_macro
 overall      = (paper_f1_macro + evidence_f1_macro + answer_score) / 3
 ```
 
-Verified to six decimals against all nine leaderboard rows and all four of our
-scored runs. Paper and evidence are **two thirds** of the score; a table question
+Verified to six decimals against all 29 documented scored submissions in
+`results/official_scores.csv` (recomputed by `results/validate_table3.py`). Paper and evidence are **two thirds** of the score; a table question
 is worth 4.8× a multiple-choice one; `table_cell_accuracy_micro` is reported but
 **not scored**. Full derivation and the earlier wrong weight vector:
 [reports/endgame.md](reports/endgame.md).
@@ -67,15 +67,15 @@ is worth 4.8× a multiple-choice one; `table_cell_accuracy_micro` is reported bu
 ## Setup
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # torch==2.6.0, not +cu124
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 bash scripts/download_data.sh          # dataset is CC BY-NC 4.0, not vendored
 cp .env.example .env                   # GEMINI_API_KEY, OPENREVIEW_*, optionally GROQ/CEREBRAS
 ```
 
 Gotchas that cost real time:
 
-* `requirements.txt` pins `torch==2.6.0+cu124`, which is not on PyPI. Install
-  plain `torch==2.6.0` or use the PyTorch index.
+* `requirements.txt` pins plain `torch==2.6.0`; we ran `2.6.0+cu124`. For the
+  CUDA build use `--index-url https://download.pytorch.org/whl/cu124`.
 * Pre-download `bge-reranker-base` and `bge-large-en-v1.5`. The per-question
   SIGALRM watchdog fires during a first-use model download and turns every
   question into a timeout with empty `paper_ids`.
@@ -186,7 +186,7 @@ littraceqa/
   answer/
     build.py           schema-exact records, type coercion
     table_visual.py    read table cells off a rendered page
-exp/                   numbered, reproducible experiments (01-19)
+exp/                   numbered, reproducible experiments (01-22 + run_ablation.py = 23)
 reports/               measurements, including every negative result
 HYPOTHESES.md          backlog, minimum 5 untried entries
 ```

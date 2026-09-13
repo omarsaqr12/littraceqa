@@ -311,7 +311,7 @@ and we sized our evidence sets accordingly.
 \paragraph{Source type follows the question's wording.}
 Conditioning gold's source type on the question's vocabulary is predictive on
 the development split, though on small denominators
-(Table~\ref{tab:conventions}). Acting on it produced our largest evidence gain:
+(Table~\ref{tab:conventions}). Acting on it produced a substantial evidence gain:
 we had been emitting \emph{no} \texttt{equation\_algorithm} items at all, and
 adding them alongside \texttt{text\_span} on six equation-form questions
 coincided with official evidence F1 moving from $0.6610$ to $0.7121$ (that
@@ -604,8 +604,8 @@ or train any models, so there are no checkpoints of ours to release.
 \paragraph{Software and compute.} Python, with PyMuPDF \citep{pymupdf} for page
 text, caption indices and rasterisation. Local checks used the organisers'
 \texttt{evaluate.py} and their \texttt{validate\_submission.py} extended with the
-dead-run guard of \S\ref{sec:results}. All work ran on one workstation; the only
-GPU use was local inference and reranking.
+dead-run guard of \S\ref{sec:results}. All work ran on one workstation; GPU use
+was limited to dense retrieval/embedding, reranking and local inference.
 
 \paragraph{Reproducibility.} Code, reports and the submitted output file are at
 \url{https://github.com/omarsaqr12/littraceqa}: the pipeline, the 23 experiment

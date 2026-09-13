@@ -8,5 +8,9 @@ python-dotenv==1.2.2
 RapidFuzz==3.14.5
 requests==2.34.2
 sentence-transformers==5.7.0
-torch==2.6.0+cu124
+# torch: we ran 2.6.0+cu124. That local wheel is not on PyPI, so the plain
+# version is pinned here to keep `pip install -r requirements.txt` working.
+# For the CUDA 12.4 build:
+#   pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+torch==2.6.0
 tqdm==4.70.0

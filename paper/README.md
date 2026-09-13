@@ -1,3 +1,8 @@
+> **ARCHIVED PRE-CAMERA-READY NOTES.** Superseded by
+> [`openreview_fields.md`](openreview_fields.md), which carries the final
+> invitation, abstract, PDF and attachments. Page counts, figure counts,
+> submission counts and deadlines below are historical.
+
 # OdeD --- GroundLM 2026 Shared Task 2 (LitTraceQA) system paper
 
 `littraceqa_system.tex` -> `littraceqa_system.pdf`

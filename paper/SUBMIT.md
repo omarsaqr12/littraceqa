@@ -1,3 +1,8 @@
+> **ARCHIVED PRE-CAMERA-READY NOTES.** Superseded by
+> [`openreview_fields.md`](openreview_fields.md), which carries the final
+> invitation, abstract, PDF and attachments. Page counts, figure counts,
+> submission counts and deadlines below are historical.
+
 # Exactly what to submit --- OpenReview, GroundLM 2026
 
 Portal: <https://openreview.net/group?id=EMNLP/2026/Workshop/GroundLM>

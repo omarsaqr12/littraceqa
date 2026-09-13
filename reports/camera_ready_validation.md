@@ -22,7 +22,7 @@ searchable nor extractable. `paper/make_fig.py` now sets
 
 ## Consistency
 
-`results/check_manuscript.py` — **154 checks, 0 failed**. It verifies every
+`results/check_manuscript.py` — **151 checks, 0 failed**. It verifies every
 Table 3 cell against `results/official_scores.csv`, recomputes `overall` for
 every row with complete components, checks Table 3's stated selection rule and
 its three stated counts, checks all eight Table 2 counts against
