@@ -150,7 +150,7 @@ records for, in order. Ticks are labelled on a run's first appearance; unlabelle
 ticks are re-uploads of an identical file, and one run has no surviving local
 prediction file. The shaded region is the fully automated pipeline; from
 \texttt{v19} onwards every submission involves per-question intervention. The two
-components weighted $1/3$ account for almost all of the movement, while the two
+components weighted $1/3$ account for most of the movement, while the two
 table components weighted $1/9$ stall between $0.05$ and $0.52$ and hold most of
 our remaining headroom. \texttt{v55} regressed: we had labelled a
 caption-semantics inference ``confirmed'' when it was a heuristic, and reverting
@@ -477,9 +477,9 @@ mid-run, with no error anywhere in the trace.
 \label{sec:errors}
 
 \paragraph{The dominant failure is the right paper, wrong row.}
-Of the answer errors we found and corrected, almost none are hallucinations. They
-are values genuinely printed in the cited paper, one row or one column from the
-one asked about: the un-finetuned base-model row instead of the fine-tuned one;
+The corrected answer errors were primarily wrong-row or wrong-column selections
+rather than unsupported values. They are values genuinely printed in the cited
+paper, one row or one column from the one asked about: the un-finetuned base-model row instead of the fine-tuned one;
 \texttt{RPEt} where \texttt{RPEr} was asked; the \texttt{MC1} column where the
 question says \texttt{MC3}; inter-annotator agreement where the question says
 intra-annotator; a \emph{Pearson} column read as a Kendall one; the \emph{None}
@@ -502,7 +502,7 @@ $2\times$ and reading them settled all four and corrected one answer: a paper
 states in prose that it classifies models into \emph{eight} categories, and its
 pie-chart labels agree, where we had answered six.
 
-\paragraph{Annotator-invented strings are not recoverable.}
+\paragraph{Annotator-invented strings were not recovered by our approach.}
 Where a table's row-key column is a descriptor the annotator invented
 (\texttt{quantity}, \texttt{setting}, \texttt{attribute}, \texttt{metric}), we
 never matched it. Our record on guessing such strings is \textbf{0 for 13}: three
@@ -598,8 +598,8 @@ Retrieval used \texttt{BAAI/bge-large-en-v1.5} for dense embeddings
 \citep{bge-embed} and \texttt{BAAI/bge-reranker-base} as cross-encoder reranker
 \citep{bge-rerank}. The audit loop of \S\ref{sec:system} was carried out by an
 LLM agent (Anthropic Claude \citep{claude-models}) reading page text and
-rasterised pages; we did not record the dated model version. We fine-tuned and
-trained nothing, so there are no checkpoints of ours to release.
+rasterised pages; we did not record the dated model version. We did not
+fine-tune or train any models, so there are no checkpoints of ours to release.
 
 \paragraph{Software and compute.} Python, with PyMuPDF \citep{pymupdf} for page
 text, caption indices and rasterisation. Local checks used the organisers'
