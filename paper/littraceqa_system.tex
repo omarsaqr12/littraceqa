@@ -598,8 +598,8 @@ Retrieval used \texttt{BAAI/bge-large-en-v1.5} for dense embeddings
 \citep{bge-embed} and \texttt{BAAI/bge-reranker-base} as cross-encoder reranker
 \citep{bge-rerank}. The audit loop of \S\ref{sec:system} was carried out by an
 LLM agent (Anthropic Claude \citep{claude-models}) reading page text and
-rasterised pages; we did not record the dated model version. We did not
-fine-tune or train any models, so there are no checkpoints of ours to release.
+rasterised pages; we did not record the dated model version. We did not fine-tune
+or train any models, so there are no checkpoints of ours to release.
 
 \paragraph{Software and compute.} Python, with PyMuPDF \citep{pymupdf} for page
 text, caption indices and rasterisation. Local checks used the organisers'
@@ -607,15 +607,16 @@ text, caption indices and rasterisation. Local checks used the organisers'
 dead-run guard of \S\ref{sec:results}. All work ran on one workstation; the only
 GPU use was local inference and reranking.
 
-\paragraph{Reproducibility.} The repository holds the pipeline, the 23 experiment
-scripts, the submitted test-output file, and reports recording each measurement
-including the negative ones, plus three audit scripts:
+\paragraph{Reproducibility.} Code, reports and the submitted output file are at
+\url{https://github.com/omarsaqr12/littraceqa}: the pipeline, the 23 experiment
+scripts, and reports recording each measurement including the negative ones, plus
+three audit scripts:
 \texttt{count\_conventions.py} recomputes every count in
 Table~\ref{tab:conventions} from the development split,
 \texttt{validate\_table3.py} recomputes \emph{overall} from the official
 components of every submission in the evaluator log, and
 \texttt{check\_manuscript.py} checks the numbers printed here against both. We
-redistribute no dataset and no test label; the scripts read the official release. The crowded-page check of
+redistribute no dataset or test label; the scripts read the official release. The crowded-page check of
 \S\ref{sec:results} was run ad hoc and is described in the reports rather than
 packaged.
 
@@ -633,7 +634,7 @@ for that reason, and include the submission that regressed rather than only our
 best.
 
 Second, the conventions in \S\ref{sec:conventions} are counts over 55 development
-questions and several rest on small denominators ($3/3$, $8/8$, $10/10$). They
+questions, several resting on small denominators ($3/3$, $8/8$, $10/10$). They
 were predictive on test, which is evidence, but are not established at any
 conventional level of confidence.
 
@@ -651,11 +652,11 @@ component is not reducible by better reading.
 
 This does not invalidate the benchmark, since provenance should be scored and
 coarse keys are a reasonable way to do it, but the table components measure
-something different from the evidence components, and a system's score can move
-without its grounding improving. A future edition might publish the row-key
-vocabulary alongside the schema, accept a small set of canonical object-id
-spellings, or score cells against gold rows independently of key matching. Any of
-the three would make the answer metrics measure answering.
+something different from the evidence components, and a score can move without
+grounding improving. A future edition might publish the row-key vocabulary
+alongside the schema, accept a small set of canonical object-id spellings, or
+score cells against gold rows independently of key matching. Any of the three
+would make the answer metrics measure answering.
 
 Fourth, we did not submit to \texttt{littraceqa-test-extra}, so we cannot report
 how these findings transfer to its larger question pool.
@@ -666,10 +667,10 @@ Papers were retrieved from publisher-provided URLs in the released metadata and
 used only for evidence extraction, within the dataset's CC BY-NC 4.0 terms. Such
 systems make claims about literature checkable by pointing at a specific page of a
 specific paper, which we consider beneficial. The risk is that a confidently
-formatted citation persuades even when wrong, and our error analysis shows the
-dominant failure is a citation that is \emph{almost} right: the correct paper and
-an adjacent row. Such systems should surface the located span for confirmation
-rather than presenting a grounded answer as settled.
+formatted citation persuades even when wrong, and our dominant failure is a
+citation that is \emph{almost} right: the correct paper, an adjacent row. Such
+systems should surface the located span for confirmation rather than presenting a
+grounded answer as settled.
 
 \section{Conclusion}
 
