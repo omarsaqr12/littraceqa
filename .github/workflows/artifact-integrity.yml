@@ -1,0 +1,13 @@
+name: Artifact integrity (no API keys)
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  artifact-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check documentation paths and retained score arithmetic
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v

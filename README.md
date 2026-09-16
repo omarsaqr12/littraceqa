@@ -1,192 +1,108 @@
-# LitTraceQA — OdeD's system for GroundLM @ EMNLP 2026
+# LitTraceQA | Literature-grounded question answering
 
-Team **OdeD** (Omar Saqr, Mostafa Gaafar — The American University in Cairo).
+**GroundLM 2026 shared task · Team OdeD · Omar Saqr and Mostafa Gaafar, The American University in Cairo**
 
-**Task.** Answer a research question by finding the paper(s) in a 27,487-paper
-pool, locating the specific evidence inside them (a table cell, a figure panel,
-an equation, a citation context), and emitting the answer in the requested shape
-— multiple choice or a structured table.
+LitTraceQA is a research system for answering questions about scientific papers. Given a question and a **27,487-paper metadata pool**, it retrieves candidate papers, reads relevant PDFs, identifies supporting evidence, and outputs multiple-choice answers or structured tables in the shared task's exact submission format. The challenge spans **retrieval, document understanding, grounded answer construction, and evaluation**, not just text generation.
 
-**System paper:** [`paper/littraceqa_system.pdf`](paper/) — *OdeD at GroundLM 2026
-Shared Tasks: Reading the Scorer for Literature-Grounded QA*.
+[Read the system paper](paper/littraceqa_system.pdf) · [Explore the pipeline](littraceqa/pipeline.py) · [Architecture](docs/ARCHITECTURE.md) · [Experiment index](docs/EXPERIMENT_INDEX.md) · [Reproducibility](docs/REPRODUCIBILITY.md) · [Submission artifact](submission/littraceqa-test_OdeD.jsonl)
 
-## Result
+## Project highlights
 
-| | official score |
-|---|---|
-| first submission | 0.4563 |
-| best **fully automated** run | **0.5519** |
-| best submission | **0.7649** (`submission/littraceqa-test_OdeD.jsonl`) |
+| Area | What the repository contains |
+| --- | --- |
+| Retrieval | BM25, title/nickname and acronym matching, optional dense retrieval, hybrid ranking and cross-encoder reranking |
+| PDF grounding | Paper fetching, page/table/figure locator enumeration and evidence-linked reading |
+| Answer generation | Hosted/local model interfaces, multiple-choice and schema-constrained table construction |
+| Experimental rigor | Configurable ablations, retained scoring records, negative results, corrections and a documented split between automatic and manually audited submissions |
 
-The gap between 0.5519 and 0.7649 is per-question auditing against the source
-PDFs plus leaderboard-feedback attribution, not a system that would generalise.
-The paper says so in the abstract and the limitations, and reports the two
-submissions that regressed alongside the ones that helped.
+The complete flow is implemented in [`littraceqa/`](littraceqa/) and driven by [`run.py`](run.py). The [architecture guide](docs/ARCHITECTURE.md) is a source-linked map from each stage to its implementation. This was a **two-person team project**; repository ownership is not evidence of exclusive authorship of individual modules.
 
-## What is worth reading here
+## Results and evaluation context
 
-Most of the score came from studying the scorer rather than from modelling, so
-the findings live in `reports/`:
+| Historical shared-task result | Reported overall score | What was evaluated |
+| --- | ---: | --- |
+| Initial submission | 0.4563 | First submission |
+| Best fully automated run | **0.5519** | Pipeline output without per-question human auditing |
+| Best submitted artifact | **0.7649** | Submission with manual source-PDF auditing and leaderboard-feedback attribution |
 
-| file | what it records |
-|---|---|
-| `reports/scoring_and_fixes.md` | the metric decomposition, and score-guided attribution — decoding the macro metrics arithmetically to identify *which* prediction is wrong |
-| `reports/table_stage.md` | the annotation conventions recovered from 55 dev examples: one evidence key per paper, gold table rows = paper count (8/8), row keys reproduce the paper's printed labels |
-| `reports/free_selectors_and_evidence.md` | the evidence type conditionals (figure 10/10, table 3/3, equation 4/7) and the seven wrong papers found by entity-presence checks |
-| `reports/paper_selection.md` | retrieval, reranking, shortlist recall saturation |
-| `HYPOTHESES.md` | what was tried and refuted, with the measurement that killed it |
+**0.7649 is not autonomous model performance.** The [system paper](paper/littraceqa_system.pdf), [scoring analysis](reports/scoring_and_fixes.md), [submission JSONL](submission/littraceqa-test_OdeD.jsonl), and [retained official-score ledger](results/official_scores.csv) document the results and interventions. The scores are historical reported results, not an independently rerun hidden-test evaluation; the manually audited score should not be compared directly with an unattended system's score.
 
-Six heuristics were measured and dropped, and four bugs in our own verification
-scripts are documented — an analysis pipeline is itself an instrument, and ours
-was wrong four times in ways invisible until checked.
+## How it works
 
-## Reproducing
-
-    bash scripts/download_data.sh          # data is not committed (CC BY-NC 4.0)
-    cp .env.example .env                   # add your own API keys
-    python run.py --llm-select --visual-table --max-papers 3 --split test
-
-`preds/` and `logs/` are gitignored, so `reports/` is the record of every
-measurement. The five verifiers that ran over every candidate submission, and the
-scripts that generated the paper's figures, are included.
-
-## The scoring function
-
-```python
-answer_score = (multiple_choice_accuracy + table_row_f1_macro
-                + table_cell_accuracy_macro) / 3
-overall      = (paper_f1_macro + evidence_f1_macro + answer_score) / 3
+```text
+Question + paper metadata
+  → extract mentions, title cues and scope
+  → retrieve lexical / acronym / optional dense candidates
+  → hybrid ranking + cross-encoder reranking
+  → optionally select a paper shortlist with an LLM
+  → fetch PDFs and enumerate evidence locators
+  → read selected papers and construct answers
+  → validate schema-exact JSONL predictions
 ```
 
-Verified to six decimals against all 29 documented scored submissions in
-`results/official_scores.csv` (recomputed by `results/validate_table3.py`). Paper and evidence are **two thirds** of the score; a table question
-is worth 4.8× a multiple-choice one; `table_cell_accuracy_micro` is reported but
-**not scored**. Full derivation and the earlier wrong weight vector:
-[reports/endgame.md](reports/endgame.md).
+[`Pipeline`](littraceqa/pipeline.py) exposes interchangeable stages and records per-question failures; a PDF or model failure need not erase already retrieved paper IDs. [`littraceqa/retrieval/`](littraceqa/retrieval/) handles candidate generation and selection, [`littraceqa/pdf/`](littraceqa/pdf/) handles source documents, [`littraceqa/reason/`](littraceqa/reason/) handles readers and answer synthesis, and [`littraceqa/answer/`](littraceqa/answer/) builds structured outputs. A schema-valid fallback can still be wrong, so traces and missing-evidence counts matter. See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for module-level details and cost boundaries.
 
-## Setup
+## Explore the work in five minutes
+
+You can inspect the [paper](paper/littraceqa_system.pdf), [experiment index](docs/EXPERIMENT_INDEX.md), [research reports](reports/), and [results](results/) **without an API key, GPU, or dataset download**. With Python 3, run a local check of the *retained score arithmetic*:
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-bash scripts/download_data.sh          # dataset is CC BY-NC 4.0, not vendored
-cp .env.example .env                   # GEMINI_API_KEY, OPENREVIEW_*, optionally GROQ/CEREBRAS
+python3 results/validate_table3.py
 ```
 
-Gotchas that cost real time:
+This recomputes overall values from recorded component scores and reports uncheckable rows; it **does not** rerun the model or authenticate hidden-test labels. The export is partial, and the script writes CSV/JSON files under `results/`, so use a disposable checkout if you want to avoid changing tracked outputs. The [reproducibility guide](docs/REPRODUCIBILITY.md) explains the evidence levels.
 
-* `requirements.txt` pins plain `torch==2.6.0`; we ran `2.6.0+cu124`. For the
-  CUDA build use `--index-url https://download.pytorch.org/whl/cu124`.
-* Pre-download `bge-reranker-base` and `bge-large-en-v1.5`. The per-question
-  SIGALRM watchdog fires during a first-use model download and turns every
-  question into a timeout with empty `paper_ids`.
-* llama-server's usable context is `--ctx-size / --parallel`. 4096 across 2 slots
-  is 2048 per request, and it *rejects* an oversized request rather than
-  truncating.
+## Run the research pipeline
 
-## Running
+A Linux environment is recommended. A full fresh-checkout pipeline run was not independently reproduced during repository cleanup; pretrained-model downloads, source PDFs, hosted API quotas, and GPU requirements depend on the configuration. Review [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) before running the full split.
 
 ```bash
-# best known config
-.venv/bin/python run.py --split test --llm-select --visual-table --max-papers 3 \
-  --mc-samples 1 --rpm 14 --out preds/test.jsonl
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+bash scripts/download_data.sh
+cp .env.example .env   # add your own keys; never commit .env
 
-# paper selection only -- local, free, no API key
-.venv/bin/python run.py --split validation --no-read --out preds/val_retrieval.jsonl
+# Retrieval-only run: no hosted LLM key; local model downloads may occur.
+.venv/bin/python run.py --split validation --no-read \
+  --out preds/val_retrieval.jsonl
 
-.venv/bin/python scripts/validate_submission.py --input data/test.jsonl --pred preds/test.jsonl
-.venv/bin/python scripts/evaluate.py --gold data/validation.jsonl --pred preds/val.jsonl
+# Historical full-pipeline configuration; requires PDFs and hosted services.
+.venv/bin/python run.py --split test --llm-select --visual-table \
+  --max-papers 3 --mc-samples 1 --rpm 14 --out preds/test.jsonl
+
+# Validate prediction structure against the downloaded inputs and metadata.
+.venv/bin/python scripts/validate_submission.py \
+  --input data/test.jsonl --pred preds/test.jsonl
 ```
 
-## What is measured
+These are documented entry points, **not newly verified reproduction commands**. The separately hosted dataset is distributed under **CC BY-NC 4.0**, and source PDFs/model weights may have separate terms. [`download_data.sh`](scripts/download_data.sh) fetches upstream `main` without a pinned revision; preserve hashes for exact replication. It does not replace the project's extended validator; `--organizers` downloads pristine organizer scripts separately. The [data guide](data/README.md) lists inputs. The requirements pin ordinary PyTorch `2.6.0`; historical CUDA runs used `2.6.0+cu124`. Cache embedding/reranker models before a long run to avoid first-use downloads interacting with question timeouts.
 
-Every claim below has a report and a reproducible experiment behind it.
+## What the experiments taught us
 
-| finding | where |
-|---|---|
-| Scoring weights (1/3, 1/3, 1/9, 1/9, 1/9) and the earlier wrong fit | `reports/endgame.md` |
-| LLM candidate selection: **+0.0542** validation, **+0.0732** test | `reports/paper_selection.md` |
-| Paper identification by title generation fails (median similarity 56) | `reports/paper_selection.md` |
-| Candidate recall is capped by the question, not the retriever | `reports/paper_selection.md` |
-| Visual table cells: +0.0455 cell accuracy on validation, 0.000 on test | `reports/table_stage.md` |
-| Evidence padding loses (marginal-add rule does not apply) | `reports/table_stage.md` |
-| Page alignment is not the cap (72.8% agreement, no offset) | `reports/e4_e6_measurements.md` |
-| Gold table cells are never null (0/27) | `reports/e4_e6_measurements.md` |
-| ~~No free selector beats `gemini-flash-lite`~~ **retracted** — it was a rate-limit artefact | `reports/free_selectors_and_evidence.md` |
-| Cerebras selector: +0.0280 validation; changes 26/71 test papers (transfer untested) | `reports/free_selectors_and_evidence.md` |
-| Full-text indexing is a `multi_paper` lever; test-like family is 96% reachable | `reports/free_selectors_and_evidence.md` |
-| Where evidence loses, item by item | `reports/free_selectors_and_evidence.md` |
-| Local reader vs hosted (lost on test) | `reports/local_reader.md` |
-| Submission log with component breakdowns | `reports/leaderboard_gap.md` |
+The local evaluator combines paper F1, evidence F1 and an answer composite; the [scorer analysis](reports/endgame.md) explains why metric-component weights should not be confused with per-question weights. The [experiment index](docs/EXPERIMENT_INDEX.md) links **22 numbered experiments and the ablation runner**; reports retain failures and retracted interpretations rather than hiding them.
 
-## Three things that decide this task
+| Investigation | Recorded finding | Evidence |
+| --- | --- | --- |
+| Paper retrieval | Selecting from retrieved candidates helped in a validation comparison; generating paper titles directly was not a replacement for retrieval. | [Selection analysis](reports/paper_selection.md) |
+| Table understanding | Rendered table cells helped one validation metric, while row-key quality and hidden-test transfer remained separate problems. | [Table-stage analysis](reports/table_stage.md) |
+| Evidence and scoring | Page offsets, object locators, exact row labels, and null-cell rules materially changed measured scores. | [Evidence measurements](reports/e4_e6_measurements.md) · [Scoring fixes](reports/scoring_and_fixes.md) |
+| Failed hypotheses | A free-selector comparison was retracted after rate-limit errors contaminated the experiment; other heuristic changes were rejected. | [Corrected selector analysis](reports/free_selectors_and_evidence.md) · [Hypotheses ledger](HYPOTHESES.md) |
 
-1. **The scoring code, read literally.** `answer.multiple_choice` takes `gold`,
-   not `label`; freeform is exact match and absent from the test set; the
-   evidence key is a coarse 4-tuple ignoring `row`/`column`/`region`; a null cell
-   scores zero because gold is never null.
-2. **Paper selection multiplies into everything.** Evidence recall is bounded by
-   `paper_recall × locator_accuracy`, and MC is 0.600 with a correct paper against
-   0.062 without. Every downstream gain this project made came from selection.
-3. **Validation and test are different problems, and only one of them is scored.**
-   77% of validation gold papers are never named in their own question — the
-   `multi_paper` cluster regime, absent from test, which is why validation paper F1
-   (0.60) sits far below test (0.80). Both of the largest levers found late,
-   full-text indexing and a stronger selector, turned out to be levers on
-   `multi_paper` and measured **zero** on test. Check which regime a lever serves
-   before building it. The remaining test headroom is candidate recall — getting
-   the gold paper into the shortlist — because two independent selectors agree on
-   71/71 test questions and both leave the same 0.20 gap.
+These are **the team's historical observations**, not newly reproduced measurements. Validation results should not automatically be interpreted as hidden-test gains; see [leaderboard gap](reports/leaderboard_gap.md).
 
-## Method notes
+## Repository map
 
-Two rules learned the expensive way, both from repeated failures here:
+| Directory | Start here |
+| --- | --- |
+| [`littraceqa/`](littraceqa/) | Retrieval, PDF processing, model clients, reasoning and answer building |
+| [`docs/`](docs/) | [Architecture](docs/ARCHITECTURE.md), [reproducibility](docs/REPRODUCIBILITY.md), [experiment index](docs/EXPERIMENT_INDEX.md) |
+| [`exp/`](exp/) | Historical experiments and ablations, indexed in [`exp/README.md`](exp/README.md) |
+| [`reports/`](reports/) | Detailed findings, corrections and manuscript audits |
+| [`results/`](results/) | Partial evaluator log, retained scores and arithmetic checks |
+| [`paper/`](paper/) | [Paper PDF](paper/littraceqa_system.pdf), LaTeX and bibliography; its README contains archived pre-camera-ready notes |
+| [`submission/`](submission/) | Historical submitted predictions, including the manually audited artifact |
+| [`scripts/`](scripts/) · [`schema/`](schema/) | Data/evaluation utilities, modified validator and submission schema |
 
-* **Do not ship on a validation delta below 0.02.** Three changes were decided
-  inside a bootstrap CI three times wider than the effect; the two that were
-  measurable on test returned zero or worse. Only the one large effect
-  (+0.0542) transferred.
-* **Both arms of an A/B must come from the same session with the same flags.**
-  Quoting one arm from an older report produced a local-vs-hosted conclusion that
-  test reversed — and then, after this rule was written down, produced a
-  free-selector conclusion that had to be retracted. Re-running the control moved
-  the baseline 0.0089.
-* **Read the error counter before the score, and never publish an ordering taken
-  from a run with errors.** A failed call falls back silently, so a rate-limited
-  arm is part model and part BM25. This inverted the sign of a result: 0.5538
-  "loss" at 58 errors, 0.6182 win at 1 error.
+## Authorship, limitations and license
 
-## Layout
-
-```
-littraceqa/
-  textnorm.py          squash / demangle -- fixes the pool's mangled titles
-  corpus.py            paper pool, Question/Paper types, JSONL io
-  retrieval/
-    lexical.py         BM25 + nickname n-gram index
-    acronym.py         title-initialism index (IMM -> Inductive Moment Matching)
-    scope.py           venue/year extraction from question text
-    hybrid.py          per-mention RRF fusion
-    dense.py           bi-encoder over title+abstract, cached embedding matrix
-    rerank.py          cross-encoder rerank (bge-reranker-base)
-    verify.py          LLM selection over the shortlist  <- the big win
-    identify.py        title generation + pool matching   (killed, kept for the record)
-    mention_verify.py  full-text mention filtering        (killed, +0.003)
-    select.py          mention-anchored selection
-    expand.py          cluster expansion                  (killed by exp/06)
-  pdf/
-    fetch.py           per-venue routing, mirrors, disk cache
-    objects.py         enumerate the locators a PDF can support
-    read.py            page text, caption index, references, rasterisation
-  reason/
-    client.py          Gemini client: model rotation, per-day 429s, caching
-    local_client.py    OpenAI-compatible client (llama-server / Groq / Cerebras)
-    local_llm.py       local GPU reader
-    localize.py        read one paper, return answer + locator
-    solve.py           MC / table / freeform synthesis
-  answer/
-    build.py           schema-exact records, type coercion
-    table_visual.py    read table cells off a rendered page
-exp/                   numbered, reproducible experiments (01-22 + run_ablation.py = 23)
-reports/               measurements, including every negative result
-HYPOTHESES.md          backlog, minimum 5 untried entries
-```
+**Omar Saqr and Mostafa Gaafar** developed this entry as team OdeD. The best manually audited submission is not a measurement of generalizable unattended accuracy. Exact reproduction additionally depends on dataset revision, PDF access, external model versions, quotas, and evaluation conventions; see the [paper](paper/littraceqa_system.pdf) and [reproducibility guide](docs/REPRODUCIBILITY.md). Repository licensing is documented in [LICENSE](LICENSE); external datasets, papers and model weights retain their own terms.
