@@ -17,6 +17,10 @@ FRONT_DOOR_DOCS = (
     ROOT / "docs" / "ARCHITECTURE.md",
     ROOT / "docs" / "EXPERIMENT_INDEX.md",
     ROOT / "docs" / "REPRODUCIBILITY.md",
+    ROOT / "exp" / "README.md",
+    ROOT / "reports" / "README.md",
+    ROOT / "results" / "README.md",
+    ROOT / "submission" / "README.md",
 )
 LINK = re.compile(r"\[[^\]\n]+\]\(([^)\n]+)\)")
 SCORE_FIELDS = ("paper_f1", "evidence_f1", "mc", "row_f1", "cell_acc")
